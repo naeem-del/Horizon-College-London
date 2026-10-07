@@ -1,0 +1,12 @@
+<%- include('../partials/header') %>
+<%- include('../partials/portal-nav') %>
+<div class="portal-main"><div class="wrap" style="max-width:900px">
+  <h1 style="font-size:2.3rem">Policies</h1>
+  <p class="muted">College policies that apply to you as a learner. Please read them and contact us if you have any questions.</p>
+  <% if (policies.length) { %>
+    <%- include('../partials/policy-list', { policies, manage: false }) %>
+  <% } else { %>
+    <div class="panel empty"><h3>No policies yet</h3><p class="muted">Policies will appear here once the college publishes them.</p></div>
+  <% } %>
+</div></div>
+<%- include('../partials/footer') %>

@@ -1,0 +1,62 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1><%= course.id ? 'Edit course' : 'Add course' %></h1><a href="/admin/courses">Back to courses</a></div>
+<form class="form-card course-form" method="post" action="/admin/courses/save" enctype="multipart/form-data">
+  <%- include('../partials/csrf') %><input type="hidden" name="id" value="<%= course.id || '' %>">
+  <% if (!course.id) { %>
+    <fieldset class="mode-pick">
+      <legend>How do you want to add this course?</legend>
+      <label class="mode-card"><input type="radio" name="mode" value="manual" checked><span><strong>Build it manually</strong><small>Enter the course details, then add modules, lessons, videos and assignments yourself.</small></span></label>
+      <label class="mode-card"><input type="radio" name="mode" value="scorm"><span><strong>Upload a SCORM package</strong><small>Upload a ready-made SCORM 1.2 or 2004 .zip. The course and its lesson are created from it in one step.</small></span></label>
+    </fieldset>
+    <div class="scorm-only">
+      <label class="field"><span>SCORM package</span><input type="file" name="scorm" accept=".zip,application/zip"><small>The .zip exported from Articulate, Captivate, iSpring, Elucidat or similar, up to 500 MB. Learners’ progress, scores and completion are recorded automatically.</small></label>
+    </div>
+  <% } %>
+  <label class="field"><span>Title</span><input type="text" name="title" id="course-title" value="<%= course.title || '' %>" required><small class="scorm-only">Optional: leave blank to use the title inside the package.</small></label>
+  <div class="manual-only">
+  <div class="two">
+    <label class="field"><span>Awarding body</span><select name="awarding_body_id"><option value="">None</option>
+      <% bodies.forEach(b => { %><option value="<%= b.id %>" <%= course.awarding_body_id === b.id ? 'selected' : '' %>><%= b.name %></option><% }) %></select></label>
+    <label class="field"><span>Web address</span><input type="text" name="slug" value="<%= course.slug || '' %>" placeholder="Created from the title"><small>/courses/<em>this-part</em></small></label>
+  </div>
+  <div class="two">
+    <label class="field"><span>Level</span><input type="text" name="level" value="<%= course.level || '' %>" placeholder="Level 4"></label>
+    <label class="field"><span>Qualification type</span><input type="text" name="qualification_type" value="<%= course.qualification_type || '' %>" placeholder="NVQ Diploma"></label>
+  </div>
+  <div class="two">
+    <label class="field"><span>Framework</span><input type="text" name="framework" value="<%= course.framework || '' %>" placeholder="RQF"></label>
+    <label class="field"><span>Fee (£)</span><input type="number" name="price" step="0.01" min="0" value="<%= course.price || '' %>"><small>Leave empty to show “Ask us”.</small></label>
+  </div>
+  <div class="two">
+    <label class="field"><span>Duration</span><input type="text" name="duration" value="<%= course.duration || '' %>" placeholder="9–12 months"></label>
+    <label class="field"><span>Study mode</span><input type="text" name="study_mode" value="<%= course.study_mode || '' %>" placeholder="Online, work-based"></label>
+  </div>
+  <label class="field"><span>Summary</span><input type="text" name="summary" value="<%= course.summary || '' %>" maxlength="220"><small>One sentence, shown on course cards.</small></label>
+  <label class="field"><span>Description</span><textarea name="description" style="min-height:180px"><%= course.description || '' %></textarea></label>
+  <label class="field"><span>Who it’s for / entry requirements</span><textarea name="entry_requirements"><%= course.entry_requirements || '' %></textarea></label>
+  <label class="field"><span>How it’s assessed</span><textarea name="assessment"><%= course.assessment || '' %></textarea></label>
+  <label class="field"><span>Cover image</span><input type="file" name="image" accept=".png,.jpg,.jpeg,.webp">
+    <% if (course.image) { %><img src="/uploads/images/<%= course.image %>" alt="" style="height:90px;margin-top:10px;border-radius:8px"><% } %></label>
+  </div>
+  <p class="small muted scorm-only">You can add the website details (level, awarding body, description, cover image) afterwards with Edit.</p>
+  <label class="check"><input type="checkbox" name="published" <%= course.published ? 'checked' : '' %>> Published on the website</label>
+  <label class="check"><input type="checkbox" name="featured" <%= course.featured ? 'checked' : '' %>> Feature on the home page</label>
+  <button class="btn btn-navy" style="margin-top:10px"><%= course.id ? 'Save course' : 'Add course' %></button>
+</form>
+<% if (!course.id) { %>
+<script>
+  // Switch between the full course form and the SCORM upload
+  (function () {
+    const form = document.querySelector('.course-form'), title = document.getElementById('course-title'), file = form.querySelector('input[name=scorm]');
+    const button = form.querySelector('button.btn-navy');
+    function sync() {
+      const scorm = form.querySelector('input[name=mode]:checked').value === 'scorm';
+      form.classList.toggle('is-scorm', scorm);
+      title.required = !scorm; file.required = scorm;
+      button.textContent = scorm ? 'Upload and create course' : 'Add course';
+    }
+    form.addEventListener('change', e => { if (e.target.name === 'mode') sync(); }); sync();
+  })();
+</script>
+<% } %>
+<%- include('../partials/admin-footer') %>

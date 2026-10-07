@@ -1,0 +1,19 @@
+<%- include('../partials/header') %>
+<div class="auth">
+  <div class="auth-art"><h2>Your course, all in one place.</h2><p>Follow your units, upload evidence and get feedback from your assessor.</p></div>
+  <div class="auth-form">
+    <form method="post" action="/register" novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h1 style="font-size:2.2rem">Create account</h1>
+      <% if (errors.length) { %><div class="errors" role="alert"><ul><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div><% } %>
+      <label class="field"><span>Full name</span><input type="text" name="name" value="<%= values.name || '' %>" autocomplete="name" required></label>
+      <label class="field"><span>Email</span><input type="email" name="email" value="<%= values.email || '' %>" autocomplete="email" required></label>
+      <label class="field"><span>Phone <small style="display:inline;font-weight:400">(optional)</small></span><input type="tel" name="phone" value="<%= values.phone || '' %>" autocomplete="tel"></label>
+      <label class="field"><span>Password</span><input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
+      <label class="field"><span>Confirm password</span><input type="password" name="password2" autocomplete="new-password" required></label>
+      <button class="btn btn-navy" style="width:100%;justify-content:center">Create account</button>
+      <p class="small muted" style="margin-top:18px">Already have an account? <a href="/login">Log in</a></p>
+    </form>
+  </div>
+</div>
+</main></body></html>

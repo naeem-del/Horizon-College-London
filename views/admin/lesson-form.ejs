@@ -1,0 +1,68 @@
+<%- include('../partials/admin-header') %>
+<% const isTask = lesson.kind === 'assignment'; %>
+<div class="admin-top"><h1><%= lesson.id ? (isTask ? 'Edit assignment' : 'Edit lesson') : (isTask ? 'Set an assignment' : 'Add lesson') %></h1><a href="/admin/courses/<%= module.course_id %>/content">Back to course content</a></div>
+<p class="muted"><%= course.title %> · Module: <strong><%= module.title %></strong></p>
+<form class="form-card lesson-form" method="post" action="/admin/lessons/save" enctype="multipart/form-data">
+  <%- include('../partials/csrf') %>
+  <input type="hidden" name="id" value="<%= lesson.id || '' %>"><input type="hidden" name="module_id" value="<%= module.id %>">
+  <label class="field"><span>Title</span><input type="text" name="title" value="<%= lesson.title || '' %>" required></label>
+  <label class="field"><span>Type</span>
+    <select name="kind" id="kind">
+      <option value="lesson" <%= !isTask ? 'selected' : '' %>>Lesson: learner reads or watches, then marks it complete</option>
+      <option value="assignment" <%= isTask ? 'selected' : '' %>>Assignment: learner uploads work for review, with a deadline</option>
+    </select></label>
+
+  <fieldset class="task-only" id="task-box">
+    <legend>Who it’s for and when it’s due</legend>
+    <div class="two" style="max-width:560px">
+      <label class="field"><span>Deadline</span><input type="date" name="due_date" value="<%= lesson.due_date || '' %>"><small>Leave blank for no deadline.</small></label>
+      <label class="field"><span>Total marks</span><input type="number" name="total_marks" min="1" max="10000" step="0.5" value="<%= lesson.total_marks || '' %>" placeholder="e.g. 100"><small>Leave blank if this assignment isn’t marked.</small></label>
+    </div>
+    <label class="check"><input type="radio" name="assign_to" value="all" <%= lesson.assign_to !== 'selected' ? 'checked' : '' %>> All learners on this course</label>
+    <label class="check"><input type="radio" name="assign_to" value="selected" <%= lesson.assign_to === 'selected' ? 'checked' : '' %>> Only the learners I choose</label>
+    <div id="pick-box" class="pick-box">
+      <% if (!learners.length) { %><p class="small muted" style="margin:0">No learners are enrolled on this course yet.</p><% } %>
+      <% learners.forEach(l => { const on = l.id in picked; %>
+        <div class="pick-row">
+          <label class="check" style="margin:0"><input type="checkbox" name="learners" value="<%= l.id %>" <%= on ? 'checked' : '' %>> <%= l.name %> <span class="small muted"><%= l.email %><%= l.status === 'pending' ? ' · enrolment pending' : '' %></span></label>
+          <label class="small">Own deadline <input type="date" name="due_<%= l.id %>" value="<%= picked[l.id] || '' %>" aria-label="Deadline for <%= l.name %>"></label>
+        </div>
+      <% }) %>
+      <% if (learners.length) { %><p class="small muted" style="margin:10px 0 0">An individual deadline overrides the main one for that learner (e.g. an extension).</p><% } %>
+    </div>
+    <label class="check" style="margin-top:14px"><input type="checkbox" name="notify" value="1" <%= lesson.id ? '' : 'checked' %>> Email the learners about this assignment when I save</label>
+  </fieldset>
+
+  <label class="field"><span><span class="task-only-inline">Instructions</span><span class="lesson-only-inline">Content</span></span><textarea name="content" style="min-height:240px"><%= lesson.content || '' %></textarea><small>Leave a blank line between paragraphs.</small></label>
+
+  <fieldset class="lesson-only">
+    <legend>SCORM package <small class="muted" style="font-weight:400">(optional)</small></legend>
+    <label class="field" style="margin-bottom:0"><span><%= lesson.scorm_folder ? 'Replace the package' : 'Upload a SCORM .zip' %></span><input type="file" name="scorm" accept=".zip,application/zip">
+      <small>A SCORM 1.2 or 2004 package exported from Articulate, Captivate, iSpring, Elucidat and similar tools, up to 500 MB. Learners play it inside the lesson, and it marks itself complete when they finish or pass it.</small>
+      <% if (lesson.scorm_folder) { %><small>Current: SCORM <%= lesson.scorm_version %> package, launches <a href="/portal/scorm/<%= lesson.id %>/content/<%= lesson.scorm_launch %>" target="_blank"><%= lesson.scorm_launch.split('?')[0] %></a>. Replacing or removing it clears learners’ saved progress in it.</small>
+        <label class="check" style="margin-top:8px"><input type="checkbox" name="remove_scorm"> Remove this package</label><% } %></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Video <small class="muted" style="font-weight:400">(optional)</small></legend>
+    <label class="field"><span>Video link</span><input type="url" name="video_url" value="<%= lesson.video_url || '' %>" placeholder="YouTube or Vimeo link"></label>
+    <label class="field" style="margin-bottom:0"><span>Or upload a video file</span><input type="file" name="video" accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"><small>MP4, WebM or MOV, up to 500 MB. For long videos a YouTube or Vimeo link loads faster for learners.</small>
+      <% if (lesson.video_file) { %><small>Current: <a href="/uploads/videos/<%= lesson.video_file %>" target="_blank"><%= lesson.video_file %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_video"> Remove this video</label><% } %></label>
+  </fieldset>
+
+  <label class="field"><span>Downloadable resource <small style="display:inline;font-weight:400">(optional)</small></span><input type="file" name="attachment" accept=".pdf,.doc,.docx,.xlsx,.pptx,.zip">
+    <% if (lesson.attachment) { %><small>Current: <a href="/uploads/files/<%= lesson.attachment %>" target="_blank"><%= lesson.attachment %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_attachment"> Remove this file</label><% } %></label>
+  <button class="btn btn-navy"><%= isTask ? 'Save assignment' : 'Save lesson' %></button>
+</form>
+<script>
+  // Show assignment-only options only when "Assignment" is chosen, and the learner list only for "Only the learners I choose"
+  (function () {
+    const form = document.querySelector('.lesson-form'), kind = document.getElementById('kind'), pick = document.getElementById('pick-box');
+    function sync() {
+      form.classList.toggle('is-task', kind.value === 'assignment');
+      pick.hidden = !(form.querySelector('input[name=assign_to]:checked') || {}).value || form.querySelector('input[name=assign_to]:checked').value !== 'selected';
+    }
+    form.addEventListener('change', sync); sync();
+  })();
+</script>
+<%- include('../partials/admin-footer') %>

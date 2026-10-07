@@ -1,0 +1,17 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>Enrolments</h1></div>
+<div class="tabs"><% ['pending','active','completed','cancelled'].forEach(s => { %><a class="<%= status === s ? 'on' : '' %>" href="?status=<%= s %>"><%= s[0].toUpperCase() + s.slice(1) %></a><% }) %></div>
+<div class="table-wrap"><table>
+  <tr><th>Learner</th><th>Course</th><th>Since</th><th></th></tr>
+  <% rows.forEach(r => { %>
+    <tr><td><a href="/admin/students/<%= r.user_id %>"><%= r.name %></a><div class="small muted"><%= r.email %></div></td><td><%= r.title %></td><td><%= date(r.created_at) %></td>
+      <td class="row-actions">
+        <% if (r.status === 'pending') { %>
+          <form method="post" action="/admin/enrolments/<%= r.id %>"><%- include('../partials/csrf') %><input type="hidden" name="status" value="active"><button class="btn btn-gold btn-sm">Confirm and open course</button></form>
+          <form method="post" action="/admin/enrolments/<%= r.id %>"><%- include('../partials/csrf') %><input type="hidden" name="status" value="cancelled"><button class="btn btn-danger btn-sm">Decline</button></form>
+        <% } else { %><a class="btn btn-line btn-sm" href="/admin/students/<%= r.user_id %>">Manage</a><% } %>
+      </td></tr>
+  <% }) %>
+  <% if (!rows.length) { %><tr><td colspan="4" class="muted">No <%= status %> enrolments.</td></tr><% } %>
+</table></div>
+<%- include('../partials/admin-footer') %>

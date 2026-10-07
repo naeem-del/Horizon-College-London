@@ -1,0 +1,105 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><div><% if (section === 'staff') { %><a href="/admin/staff" class="small">Staff</a><% } else { %><a href="/admin/students" class="small">Learners</a><% } %><h1><%= student.name %></h1></div></div>
+<div class="cols-2">
+  <div class="panel">
+    <h3>Details</h3>
+    <div class="profile-top">
+      <% if (student.photo) { %><img class="passport" src="/uploads/images/<%= student.photo %>" alt="Photo of <%= student.name %>" width="120" height="150"><% } else { %><span class="passport passport-empty" aria-hidden="true"><%= initials(student.name) %></span><% } %>
+    <dl class="facts">
+      <dt>Email</dt><dd><%= student.email %></dd>
+      <dt>Phone</dt><dd><%= student.phone || '—' %></dd>
+      <dt>Address</dt><dd style="white-space:pre-line"><%= student.address || '—' %></dd>
+      <dt>Postcode</dt><dd><%= student.postcode || '—' %></dd>
+      <% if (student.role === 'student') { %><dt>Date of birth</dt><dd><%= student.dob || '—' %></dd><% } %>
+      <dt>Joined</dt><dd><%= date(student.created_at) %></dd>
+    </dl>
+    </div>
+    <% if (user.role === 'admin') { %>
+      <details class="edit-details">
+        <summary class="btn btn-line btn-sm">Edit details</summary>
+        <form method="post" action="/admin/students/<%= student.id %>/details" enctype="multipart/form-data" style="margin-top:16px"><%- include('../partials/csrf') %>
+          <% const parts = student.first_name || student.last_name ? [student.first_name, student.last_name] : [student.name.split(' ')[0], student.name.split(' ').slice(1).join(' ')]; %>
+          <div class="two">
+            <label class="field"><span>First name</span><input type="text" name="first_name" value="<%= parts[0] || '' %>" required></label>
+            <label class="field"><span>Last name</span><input type="text" name="last_name" value="<%= parts[1] || '' %>"></label>
+          </div>
+          <label class="field"><span>Phone number</span><input type="tel" name="phone" value="<%= student.phone || '' %>"></label>
+          <label class="field"><span>Address</span><textarea name="address" rows="2"><%= student.address || '' %></textarea></label>
+          <label class="field"><span>Postcode</span><input type="text" name="postcode" value="<%= student.postcode || '' %>" style="text-transform:uppercase"></label>
+          <label class="field"><span><%= student.photo ? 'Replace profile picture' : 'Profile picture' %></span><input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"></label>
+          <% if (student.photo) { %><label class="small" style="display:block;margin:-8px 0 16px"><input type="checkbox" name="remove_photo" value="1"> Remove current picture</label><% } %>
+          <button class="btn btn-navy btn-sm">Save details</button>
+        </form>
+      </details>
+    <% } %>
+    <% if (user.role === 'admin') { %>
+      <form method="post" action="/admin/students/<%= student.id %>/role" class="inline-form"><%- include('../partials/csrf') %>
+        <label class="field"><span>Role</span><select name="role"><% ['student','tutor','admin'].forEach(r => { %><option <%= student.role === r ? 'selected' : '' %>><%= r %></option><% }) %></select></label>
+        <button class="btn btn-line btn-sm">Change role</button>
+      </form>
+      <form method="post" action="/admin/students/<%= student.id %>/invite" style="margin-top:12px"><%- include('../partials/csrf') %>
+        <button class="btn btn-line btn-sm">Email a set-password link</button>
+        <small class="muted" style="display:block;margin-top:6px">Use if they didn’t get the invitation or have lost access.</small>
+      </form>
+    <% } %>
+  </div>
+  <% if (student.role !== 'student') { %>
+  <div class="panel">
+    <h3>Courses they teach</h3>
+    <% teaching.forEach(c => { %>
+      <div class="lesson-row" style="padding-left:0;padding-right:0">
+        <a href="/admin/courses/<%= c.id %>/content"><strong><%= c.title %></strong></a>
+        <% if (user.role === 'admin') { %><form method="post" action="/admin/courses/<%= c.id %>/staff/<%= student.id %>/remove" data-confirm="Remove <%= student.name %> from <%= c.title %>?"><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm">Remove</button></form><% } %>
+      </div>
+    <% }) %>
+    <% if (!teaching.length) { %><p class="muted">Not assigned to any course yet.</p><% } %>
+    <% const free = courses.filter(c => !teaching.some(t => t.id === c.id)); if (user.role === 'admin' && free.length) { %>
+      <form method="post" action="/admin/students/<%= student.id %>/teach" class="inline-form" style="margin-top:14px"><%- include('../partials/csrf') %>
+        <label class="field"><span>Assign to a course</span><select name="course_id"><% free.forEach(c => { %><option value="<%= c.id %>"><%= c.title %></option><% }) %></select></label>
+        <button class="btn btn-navy btn-sm">Assign</button>
+      </form>
+    <% } %>
+  </div>
+  <% } else { %>
+  <div class="panel">
+    <h3>Enrolments</h3>
+    <% enrolments.forEach(e => { %>
+      <div class="lesson-row" style="padding-left:0;padding-right:0">
+        <span><strong><%= e.title %></strong><br><span class="small muted"><%= e.pct %>% complete</span></span>
+        <% if (user.role === 'admin') { %>
+        <form method="post" action="/admin/enrolments/<%= e.id %>"><%- include('../partials/csrf') %>
+          <select name="status" onchange="this.form.submit()" aria-label="Enrolment status"><% ['pending','active','completed','cancelled'].forEach(s => { %><option <%= e.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select>
+        </form>
+        <% } else { %><span class="status <%= e.status %>"><%= e.status %></span><% } %>
+      </div>
+    <% }) %>
+    <% if (!enrolments.length) { %><p class="muted">Not enrolled on any course.</p><% } %>
+    <% if (user.role === 'admin') { %>
+      <form method="post" action="/admin/students/<%= student.id %>/enrol" class="inline-form" style="margin-top:14px"><%- include('../partials/csrf') %>
+        <label class="field"><span>Enrol on a course</span><select name="course_id"><% courses.forEach(c => { %><option value="<%= c.id %>"><%= c.title %></option><% }) %></select></label>
+        <button class="btn btn-navy btn-sm">Enrol</button>
+      </form>
+    <% } %>
+  </div>
+  <% } %>
+</div>
+<h3 style="margin-top:28px">Evidence</h3>
+<div class="table-wrap"><table>
+  <tr><th>Task</th><th>File</th><th>Status</th><th>Mark</th><th>Uploaded</th></tr>
+  <% submissions.forEach(s => { %><tr><td><%= s.lesson_title %></td><td><a href="/admin/evidence/<%= s.id %>"><%= s.original_name %></a></td><td><span class="status <%= s.status %>"><%= s.status %></span></td><td><%= s.mark !== null ? markText(s.mark, s.total_marks) : '—' %></td><td><%= date(s.created_at) %></td></tr><% }) %>
+  <% if (!submissions.length) { %><tr><td colspan="5" class="muted">No evidence uploaded yet.</td></tr><% } %>
+</table></div>
+<% if (scormResults.length) { %>
+<h3 style="margin-top:28px">SCORM activities</h3>
+<div class="table-wrap"><table>
+  <tr><th>Activity</th><th>Course</th><th>Status</th><th>Score</th><th>Time spent</th><th>Last opened</th></tr>
+  <% scormResults.forEach(a => { const ok = ['completed','passed'].includes(a.status), bad = a.status === 'failed'; %><tr>
+    <td><%= a.lesson_title %></td><td><%= a.course_title %></td>
+    <td><span class="status <%= ok ? 'accepted' : bad ? 'resubmit' : 'pending' %>"><%= a.status || 'not attempted' %></span></td>
+    <td><%= a.score !== null ? Math.round(a.score) + '%' : '—' %></td><td><%= scormTime(a.total_time) || '—' %></td><td><%= date(a.updated_at) %></td></tr><% }) %>
+</table></div>
+<% } %>
+<% if (user.role === 'admin' && student.id !== user.id) { %>
+  <form method="post" action="/admin/students/<%= student.id %>/delete" data-confirm="Delete this account and all its progress and evidence?" style="margin-top:30px"><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm">Delete account</button></form>
+<% } %>
+<%- include('../partials/admin-footer') %>

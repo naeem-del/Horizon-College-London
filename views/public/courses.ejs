@@ -1,0 +1,23 @@
+<%- include('../partials/header') %>
+<section class="page-head"><div class="wrap">
+  <h1>Courses</h1>
+  <p>Regulated qualifications from approved awarding bodies, studied online and assessed in your workplace.</p>
+</div></section>
+<section class="section" style="padding-top:44px"><div class="wrap">
+  <form class="filters" method="get" action="/courses">
+    <label class="field" style="flex:2;min-width:220px"><span>Search</span><input type="search" name="q" value="<%= filters.q %>" placeholder="e.g. management"></label>
+    <label class="field" style="flex:1;min-width:180px"><span>Awarding body</span>
+      <select name="body"><option value="">All</option><% bodies.forEach(b => { %><option value="<%= b.slug %>" <%= filters.body === b.slug ? 'selected' : '' %>><%= b.name %></option><% }) %></select></label>
+    <label class="field" style="flex:1;min-width:140px"><span>Level</span>
+      <select name="level"><option value="">All</option><% levels.forEach(l => { %><option <%= filters.level === l ? 'selected' : '' %>><%= l %></option><% }) %></select></label>
+    <button class="btn btn-navy">Filter</button>
+    <% if (filters.q || filters.body || filters.level) { %><a href="/courses" class="small">Clear filters</a><% } %>
+  </form>
+  <p class="muted small"><%= courses.length %> <%= courses.length === 1 ? 'course' : 'courses' %></p>
+  <% if (courses.length) { %>
+    <div class="grid"><% courses.forEach(c => { %><%- include('../partials/course-card', { c }) %><% }) %></div>
+  <% } else { %>
+    <div class="panel empty"><h3>No courses match those filters</h3><p class="muted">Try a broader search, or <a href="/contact">ask us</a> about a qualification you don’t see.</p></div>
+  <% } %>
+</div></section>
+<%- include('../partials/footer') %>

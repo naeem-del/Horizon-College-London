@@ -1,0 +1,25 @@
+<%- include('head') %>
+<body>
+<a href="#main" class="sr-only">Skip to content</a>
+<div class="topbar"><div class="wrap">
+  <span class="hide-sm">Approved centre for regulated qualifications</span>
+  <span><a href="mailto:info@horizoncollegelondon.com">info@horizoncollegelondon.com</a></span>
+</div></div>
+<header class="site-header"><div class="wrap">
+  <a class="brand" href="/"><%- include('mark') %><span class="brand-name">Horizon College<small>London</small></span></a>
+  <button class="nav-toggle" aria-expanded="false" aria-controls="nav" onclick="const n=document.getElementById('nav');n.classList.toggle('open');this.setAttribute('aria-expanded',n.classList.contains('open'))">Menu</button>
+  <nav class="nav" id="nav">
+    <a href="/" class="<%= path === '/' ? 'on' : '' %>">Home</a>
+    <a href="/courses" class="<%= path.startsWith('/courses') ? 'on' : '' %>">Courses</a>
+    <a href="/awarding-bodies" class="<%= path.startsWith('/awarding') ? 'on' : '' %>">Awarding bodies</a>
+    <a href="/contact" class="<%= path === '/contact' ? 'on' : '' %>">Contact</a>
+    <% if (user) { %>
+      <a href="<%= user.role === 'student' ? '/portal' : '/admin' %>"><%= user.role === 'student' ? 'My learning' : 'Admin' %></a>
+    <% } else { %>
+      <a href="/login">Log in</a>
+    <% } %>
+    <a class="btn btn-gold" href="/enrol">Enrol now</a>
+  </nav>
+</div></header>
+<% if (flash) { %><div class="flash" role="status"><div class="<%= flash.type %>"><%= flash.text %></div></div><% } %>
+<main id="main">

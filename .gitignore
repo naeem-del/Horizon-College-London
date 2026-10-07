@@ -1,0 +1,10 @@
+node_modules/
+.env
+data/*.db*
+uploads/images/*
+uploads/evidence/*
+uploads/files/*
+uploads/videos/*
+uploads/policies/*
+uploads/scorm/*
+!uploads/**/.gitkeep

@@ -1,0 +1,29 @@
+<%- include('../partials/header') %>
+<section class="page-head"><div class="wrap">
+  <h1>Enrol</h1>
+  <p>Send us your details and an advisor will confirm your place, usually within one working day.</p>
+</div></section>
+<section class="section" style="padding-top:44px"><div class="wrap" style="max-width:760px">
+  <form class="form-card" method="post" action="/enrol" novalidate>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="hp" aria-hidden="true">Leave blank <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    <% if (errors.length) { %><div class="errors" role="alert"><strong>Check the form:</strong><ul><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div><% } %>
+    <label class="field"><span>Course of interest</span>
+      <select name="course_id" required><option value="">Choose a course</option>
+        <% courses.forEach(c => { %><option value="<%= c.id %>" <%= Number(selectedId) === c.id ? 'selected' : '' %>><%= c.title %></option><% }) %>
+      </select></label>
+    <label class="field"><span>Full name</span><input type="text" name="name" value="<%= values.name || (user ? user.name : '') %>" autocomplete="name" required></label>
+    <div class="two">
+      <label class="field"><span>Date of birth</span><input type="date" name="dob" value="<%= values.dob || '' %>" required></label>
+      <label class="field"><span>Postcode</span><input type="text" name="postcode" value="<%= values.postcode || '' %>" autocomplete="postal-code" required></label>
+    </div>
+    <div class="two">
+      <label class="field"><span>Email</span><input type="email" name="email" value="<%= values.email || (user ? user.email : '') %>" autocomplete="email" required></label>
+      <label class="field"><span>Phone <small style="display:inline;font-weight:400">(optional)</small></span><input type="tel" name="phone" value="<%= values.phone || '' %>" autocomplete="tel"></label>
+    </div>
+    <label class="field"><span>Anything we should know? <small style="display:inline;font-weight:400">(optional)</small></span><textarea name="message" placeholder="Your current role, preferred start date, questions…"><%= values.message || '' %></textarea></label>
+    <button class="btn btn-gold">Send enrolment</button>
+    <p class="small muted" style="margin:14px 0 0">We use your details only to process your enrolment.</p>
+  </form>
+</div></section>
+<%- include('../partials/footer') %>

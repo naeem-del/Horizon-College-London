@@ -1,0 +1,17 @@
+<%- include('../partials/header') %>
+<section class="page-head"><div class="wrap">
+  <div class="crumbs"><a href="/awarding-bodies">Awarding bodies</a></div>
+  <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <% if (body.logo) { %><img src="/uploads/images/<%= body.logo %>" alt="<%= body.name %> logo" style="height:64px;width:auto;background:#fff;padding:8px;border-radius:10px"><% } %>
+    <h1 style="margin:0"><%= body.name %></h1>
+  </div>
+  <div style="margin-top:18px"><%- paras(body.description) %></div>
+  <% if (body.website) { %><p><a href="<%= body.website %>" rel="noopener" target="_blank">Visit the <%= body.name %> website</a></p><% } %>
+</div></section>
+<section class="section" style="padding-top:44px"><div class="wrap">
+  <h2>Courses awarded by <%= body.name %></h2>
+  <% if (courses.length) { %>
+    <div class="grid"><% courses.forEach(c => { %><%- include('../partials/course-card', { c }) %><% }) %></div>
+  <% } else { %><p class="muted">No courses published for this awarding body yet.</p><% } %>
+</div></section>
+<%- include('../partials/footer') %>

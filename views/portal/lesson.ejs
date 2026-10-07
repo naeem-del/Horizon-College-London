@@ -1,0 +1,73 @@
+<%- include('../partials/header') %>
+<%- include('../partials/portal-nav') %>
+<div class="portal-main"><div class="wrap player">
+  <%- include('_nav') %>
+  <article class="lesson<%= scormData ? ' lesson-scorm' : '' %>">
+    <p class="muted" style="margin:0"><%= lesson.kind === 'assignment' ? 'Assignment' : scormData ? 'Interactive lesson' : 'Lesson' %></p>
+    <h1 class="lesson-title"><%= lesson.title %></h1>
+    <% const ds = dueState(lesson.due, submissions[0] && submissions[0].status); if (ds || lesson.total_marks) { %>
+      <p class="due-line"><% if (ds) { %><span class="status <%= ds.cls %>"><%= ds.text %></span> Deadline: <strong><%= dueDate(lesson.due) %></strong><% } %>
+        <% if (lesson.total_marks) { %><span>Marked out of <strong><%= markText(lesson.total_marks) %></strong></span><% } %></p>
+    <% } %>
+    <% if (scormData) { %>
+      <% const st = lesson.done ? 'completed' : (scormData.saved[scormData.version === '2004' ? 'cmi.completion_status' : 'cmi.core.lesson_status'] || 'not started'); %>
+      <div class="scorm-bar">
+        <span class="scorm-state">Status <span id="scorm-status" class="status <%= scormStatusClass(st) %>"><%= st.replace(/^\w/, c => c.toUpperCase()) %></span></span>
+        <button type="button" class="btn btn-line btn-sm scorm-full" id="scorm-full"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/></svg> Full screen</button>
+      </div>
+      <div class="scorm-wrap"><iframe id="scorm-frame" data-src="/portal/scorm/<%= lesson.id %>/content/<%= lesson.scorm_launch %>" title="<%= lesson.title %>" allow="fullscreen; autoplay"></iframe></div>
+      <p class="scorm-note">Your progress is saved as you go, so you can leave and pick up where you left off. This lesson is marked complete when you finish the activity.</p>
+      <script type="application/json" id="scorm-data"><%- JSON.stringify(scormData).replace(/</g, '\\u003c') %></script>
+      <script src="/js/scorm-player.js"></script>
+    <% } %>
+    <% if (lesson.video_file) { %>
+      <div class="video"><video src="/uploads/videos/<%= lesson.video_file %>" controls preload="metadata" playsinline></video></div>
+    <% } %>
+    <% const src = embed(lesson.video_url); if (src) { %>
+      <div class="video"><iframe src="<%= src %>" title="<%= lesson.title %> video" allowfullscreen loading="lazy"></iframe></div>
+    <% } %>
+    <div class="lesson-body"><%- paras(lesson.content) %></div>
+    <% if (lesson.attachment) { %><a class="attachment" href="/uploads/files/<%= lesson.attachment %>" download>Download resource</a><% } %>
+
+    <% if (lesson.kind === 'assignment') { %>
+      <h2 style="font-size:1.4rem;margin-top:10px">Your evidence</h2>
+      <% submissions.forEach(s => { %>
+        <div class="submission">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <a href="/portal/evidence/<%= s.id %>"><%= s.original_name %></a>
+            <span><span class="status <%= s.status %>"><%= { submitted: 'Awaiting review', accepted: 'Accepted', resubmit: 'Resubmit' }[s.status] %></span> <span class="small muted"><%= date(s.created_at) %></span></span>
+          </div>
+          <% if (s.note) { %><p class="small muted" style="margin:6px 0 0"><%= s.note %></p><% } %>
+          <% if (s.mark !== null && s.reviewed_at) { %><p class="mark-line">Your mark: <strong><%= markText(s.mark, lesson.total_marks) %></strong></p><% } %>
+          <% if (s.feedback) { %><div class="feedback"><strong>Assessor feedback:</strong> <%= s.feedback %></div><% } %>
+        </div>
+      <% }) %>
+      <% const latest = submissions[0]; if (!latest || latest.status === 'resubmit') { %>
+        <form method="post" action="/portal/courses/<%= course.slug %>/lessons/<%= lesson.id %>/submit" enctype="multipart/form-data" class="panel" style="margin-top:16px">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="field"><span><%= latest ? 'Upload a revised file' : 'Upload your file' %></span><input type="file" name="file" required><small>PDF, Word, Excel, PowerPoint, images, MP4 or ZIP, up to 20 MB.</small></label>
+          <label class="field"><span>Note for your assessor <small style="display:inline;font-weight:400">(optional)</small></span><textarea name="note" style="min-height:80px"></textarea></label>
+          <button class="btn btn-navy">Upload evidence</button>
+        </form>
+      <% } %>
+    <% } %>
+
+    <% if (prev || next || lesson.kind === 'lesson' && !lesson.scorm_folder) { %>
+    <div class="lesson-foot">
+      <div><% if (prev) { %><a class="btn btn-line btn-sm" href="/portal/courses/<%= course.slug %>/lessons/<%= prev.id %>">Previous</a><% } %></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <% if (lesson.kind === 'lesson' && !lesson.scorm_folder) { %>
+          <form method="post" action="/portal/courses/<%= course.slug %>/lessons/<%= lesson.id %>/complete">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <% if (lesson.done) { %><input type="hidden" name="undo" value="1"><button class="btn btn-line btn-sm">Mark as not done</button>
+            <% } else { %><button class="btn btn-gold btn-sm"><%= next ? 'Complete and continue' : 'Mark complete' %></button><% } %>
+          </form>
+        <% } %>
+        <% if (next && (lesson.done || lesson.kind === 'assignment')) { %><a class="btn btn-navy btn-sm" href="/portal/courses/<%= course.slug %>/lessons/<%= next.id %>">Next</a>
+        <% } else if (next && lesson.scorm_folder) { %><a class="btn btn-gold btn-sm" data-scorm-done hidden href="/portal/courses/<%= course.slug %>/lessons/<%= next.id %>">Completed: continue</a><% } %>
+      </div>
+    </div>
+    <% } %>
+  </article>
+</div></div>
+<%- include('../partials/footer') %>

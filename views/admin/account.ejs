@@ -1,0 +1,14 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>My account</h1></div>
+<form class="form-card" method="post" action="/admin/account" style="max-width:620px">
+  <%- include('../partials/csrf') %>
+  <label class="field"><span>Name</span><input type="text" name="name" value="<%= user.name %>" required></label>
+  <label class="field"><span>Email</span><input type="email" value="<%= user.email %>" disabled><small>Ask an administrator to change your email.</small></label>
+  <h3 style="margin-top:24px">Change password</h3>
+  <p class="small muted">Leave these blank to keep your current password.</p>
+  <label class="field"><span>Current password</span><input type="password" name="current" autocomplete="current-password"></label>
+  <label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password" minlength="8"><small>At least 8 characters.</small></label>
+  <label class="field"><span>Confirm new password</span><input type="password" name="password2" autocomplete="new-password"></label>
+  <button class="btn btn-navy">Save</button>
+</form>
+<%- include('../partials/admin-footer') %>

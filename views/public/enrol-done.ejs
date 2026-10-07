@@ -1,0 +1,13 @@
+<%- include('../partials/header') %>
+<section class="section"><div class="wrap" style="max-width:680px;text-align:center">
+  <%- include('../partials/mark') %>
+  <h1 style="margin-top:20px">Thanks, <%= name.split(' ')[0] %>.</h1>
+  <p class="muted" style="font-size:1.1rem">We’ve received your enrolment for <strong><%= course.title %></strong>. An advisor will contact you within one working day to confirm your place.</p>
+  <% if (!user) { %>
+    <p>Create an account now so your course is ready the moment it opens.</p>
+    <a class="btn btn-navy" href="/register">Create my account</a>
+  <% } else { %>
+    <a class="btn btn-navy" href="/portal">Go to my learning</a>
+  <% } %>
+</div></section>
+<%- include('../partials/footer') %>

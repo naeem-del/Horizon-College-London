@@ -1,0 +1,21 @@
+<div class="policy-list">
+  <% policies.forEach(p => { const ext = (p.file.split('.').pop() || '').toUpperCase(); %>
+    <div class="policy">
+      <div class="policy-main">
+        <span class="policy-icon" aria-hidden="true"><%= ext %></span>
+        <div>
+          <h3><%= p.title %></h3>
+          <% if (p.description) { %><p><%= p.description %></p><% } %>
+          <p class="small">Updated <%= date(p.updated_at) %><% if (manage) { %> · Visible to <%= { all: 'staff and learners', staff: 'staff only', learners: 'learners only' }[p.audience] %><% } %></p>
+        </div>
+      </div>
+      <div class="row-actions">
+        <a class="btn btn-navy btn-sm" href="/portal/policies/<%= p.id %>/file" target="_blank" rel="noopener"><%= ext === 'PDF' ? 'View' : 'Download' %></a>
+        <% if (manage) { %>
+          <a class="btn btn-line btn-sm" href="/admin/policies?edit=<%= p.id %>">Edit</a>
+          <form method="post" action="/admin/policies/<%= p.id %>/delete" data-confirm="Delete the policy “<%= p.title %>”?"><%- include('csrf') %><button class="btn btn-danger btn-sm">Delete</button></form>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

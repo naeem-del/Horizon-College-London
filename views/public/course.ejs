@@ -1,0 +1,49 @@
+<%- include('../partials/header') %>
+<section class="course-hero"><div class="wrap" style="position:relative;z-index:1">
+  <div class="crumbs"><a href="/courses">Courses</a><% if (course.body_name) { %> / <a href="/awarding-bodies/<%= course.body_slug %>"><%= course.body_name %></a><% } %></div>
+  <h1><%= course.title %></h1>
+  <p class="lede"><%= course.summary %></p>
+  <div class="facts">
+    <% if (course.level) { %><span><%= course.level %><%= course.framework ? ' ' + course.framework : '' %></span><% } %>
+    <% if (course.duration) { %><span><%= course.duration %></span><% } %>
+    <% if (course.study_mode) { %><span><%= course.study_mode %></span><% } %>
+  </div>
+</div></section>
+<div class="wrap detail">
+  <article>
+    <h2>About this qualification</h2>
+    <%- paras(course.description) %>
+    <% if (course.entry_requirements) { %><h2>Who it’s for</h2><%- paras(course.entry_requirements) %><% } %>
+    <% if (course.assessment) { %><h2>How you’re assessed</h2><%- paras(course.assessment) %><% } %>
+    <% if (modules.length) { %>
+      <h2>Course outline</h2>
+      <div class="outline">
+        <% modules.forEach(m => { %><div><span><%= m.title %></span><span class="muted small"><%= countMap[m.id] || 0 %> <%= countMap[m.id] === 1 ? 'item' : 'items' %></span></div><% }) %>
+      </div>
+    <% } %>
+  </article>
+  <aside class="aside-card">
+    <dl>
+      <% if (course.body_name) { %><dt>Awarding body</dt><dd><%= course.body_name %></dd><% } %>
+      <% if (course.qualification_type) { %><dt>Type</dt><dd><%= course.qualification_type %></dd><% } %>
+      <% if (course.level) { %><dt>Level</dt><dd><%= course.level %></dd><% } %>
+      <% if (course.duration) { %><dt>Duration</dt><dd><%= course.duration %></dd><% } %>
+      <dt>Fee</dt><dd><%= money(course.price) || 'Ask us' %></dd>
+    </dl>
+    <% if (enrolment && ['active','completed'].includes(enrolment.status)) { %>
+      <a class="btn btn-navy" href="/portal/courses/<%= course.slug %>">Go to course</a>
+    <% } else if (enrolment && enrolment.status === 'pending') { %>
+      <p class="small"><span class="status pending">Enrolment pending</span><br>We’ve received your enrolment and will be in touch shortly.</p>
+    <% } else { %>
+      <a class="btn btn-gold" href="/enrol?course=<%= course.slug %>">Enrol on this course</a>
+      <p class="small muted" style="margin:12px 0 0;text-align:center">Questions first? <a href="/contact">Talk to an advisor</a></p>
+    <% } %>
+  </aside>
+</div>
+<% if (related.length) { %>
+<section class="section section-mist"><div class="wrap">
+  <div class="section-head"><h2>More from <%= course.body_name || 'the college' %></h2></div>
+  <div class="grid"><% related.forEach(c => { %><%- include('../partials/course-card', { c }) %><% }) %></div>
+</div></section>
+<% } %>
+<%- include('../partials/footer') %>

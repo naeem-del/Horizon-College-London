@@ -1,0 +1,19 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>Enquiries</h1></div>
+<p class="muted">Enrolment forms and contact messages from the website. “Enrol learner” creates their account (if needed) and opens the course.</p>
+<div class="table-wrap"><table>
+  <tr><th>Received</th><th>Person</th><th>Course</th><th>Details</th><th>Status</th><th></th></tr>
+  <% rows.forEach(q => { %>
+    <tr>
+      <td><%= date(q.created_at) %></td>
+      <td><strong><%= q.name %></strong><div class="small"><a href="mailto:<%= q.email %>"><%= q.email %></a><br><%= q.phone || '' %></div></td>
+      <td><%= q.course_title || 'General message' %></td>
+      <td class="small"><% if (q.dob) { %>DOB <%= q.dob %><br><% } %><% if (q.postcode) { %><%= q.postcode %><br><% } %><span class="muted"><%= (q.message || '').slice(0, 140) %></span></td>
+      <td><form method="post" action="/admin/enquiries/<%= q.id %>"><%- include('../partials/csrf') %>
+        <select name="status" onchange="this.form.submit()" aria-label="Status"><% ['new','contacted','enrolled','closed'].forEach(s => { %><option <%= q.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select></form></td>
+      <td><% if (q.course_id && q.status !== 'enrolled') { %><form method="post" action="/admin/enquiries/<%= q.id %>"><%- include('../partials/csrf') %><input type="hidden" name="convert" value="1"><button class="btn btn-gold btn-sm">Enrol learner</button></form><% } else if (q.user_id) { %><a href="/admin/students/<%= q.user_id %>">View learner</a><% } %></td>
+    </tr>
+  <% }) %>
+  <% if (!rows.length) { %><tr><td colspan="6" class="muted">No enquiries yet.</td></tr><% } %>
+</table></div>
+<%- include('../partials/admin-footer') %>

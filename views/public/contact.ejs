@@ -1,0 +1,19 @@
+<%- include('../partials/header') %>
+<section class="page-head"><div class="wrap"><h1>Contact</h1><p>Questions about a course, fees or entry requirements? Send a message and we’ll reply within one working day.</p></div></section>
+<section class="section" style="padding-top:44px"><div class="wrap" style="display:grid;grid-template-columns:1fr 1.3fr;gap:48px">
+  <div>
+    <h3>Email</h3><p><a href="mailto:info@horizoncollegelondon.com">info@horizoncollegelondon.com</a></p>
+    <h3>Ready to start?</h3><p>Use the <a href="/enrol">enrolment form</a> and we’ll take it from there.</p>
+  </div>
+  <form class="form-card" method="post" action="/contact">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="two">
+      <label class="field"><span>Name</span><input type="text" name="name" required autocomplete="name"></label>
+      <label class="field"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
+    </div>
+    <label class="field"><span>Message</span><textarea name="message" required></textarea></label>
+    <button class="btn btn-navy">Send message</button>
+  </form>
+</div></section>
+<style>@media(max-width:800px){.section .wrap[style*="1.3fr"]{grid-template-columns:1fr!important}}</style>
+<%- include('../partials/footer') %>

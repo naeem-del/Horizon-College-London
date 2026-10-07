@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+<%- include('../partials/portal-nav') %>
+<div class="portal-main"><div class="wrap" style="max-width:760px">
+  <h1 style="font-size:2.3rem">My details</h1>
+  <form class="form-card" method="post" action="/portal/profile">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="field"><span>Full name</span><input type="text" name="name" value="<%= me.name %>" required></label>
+    <label class="field"><span>Email</span><input type="email" value="<%= me.email %>" disabled><small>To change your email, contact the college.</small></label>
+    <div class="two">
+      <label class="field"><span>Phone</span><input type="tel" name="phone" value="<%= me.phone || '' %>"></label>
+      <label class="field"><span>Date of birth</span><input type="date" name="dob" value="<%= me.dob || '' %>"></label>
+    </div>
+    <label class="field"><span>Postcode</span><input type="text" name="postcode" value="<%= me.postcode || '' %>"></label>
+    <h3 style="margin-top:24px">Change password</h3>
+    <div class="two">
+      <label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password"></label>
+      <label class="field"><span>Confirm new password</span><input type="password" name="password2" autocomplete="new-password"></label>
+    </div>
+    <button class="btn btn-navy">Save details</button>
+  </form>
+</div></div>
+<%- include('../partials/footer') %>

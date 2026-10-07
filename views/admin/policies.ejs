@@ -1,0 +1,32 @@
+<%- include('../partials/admin-header') %>
+<% const admin = user.role === 'admin'; %>
+<div class="admin-top"><h1>Policies</h1></div>
+<p class="muted"><%= admin ? 'Upload college policies here. Staff see them under Policies in the admin area, and learners under Policies in their portal.' : 'College policies for staff. Contact an administrator if something is missing or out of date.' %></p>
+
+<% if (policies.length) { %>
+  <%- include('../partials/policy-list', { policies, manage: admin }) %>
+<% } else { %>
+  <div class="panel empty"><h3>No policies yet</h3><p class="muted"><%= admin ? 'Add the first one below.' : 'Policies will appear here once an administrator uploads them.' %></p></div>
+<% } %>
+
+<% if (admin) { %>
+<h3 style="margin-top:32px" id="policy-form"><%= editing ? `Edit “${editing.title}”` : 'Add a policy' %></h3>
+<form class="form-card" method="post" action="/admin/policies/save" enctype="multipart/form-data">
+  <%- include('../partials/csrf') %>
+  <input type="hidden" name="id" value="<%= editing ? editing.id : '' %>">
+  <div class="two">
+    <label class="field"><span>Title</span><input type="text" name="title" value="<%= editing ? editing.title : '' %>" placeholder="e.g. Safeguarding Policy" required></label>
+    <label class="field"><span>Who can see it</span><select name="audience">
+      <% [['all', 'Staff and learners'], ['staff', 'Staff only'], ['learners', 'Learners only']].forEach(([v, t]) => { %><option value="<%= v %>" <%= (editing ? editing.audience : 'all') === v ? 'selected' : '' %>><%= t %></option><% }) %>
+    </select></label>
+  </div>
+  <label class="field"><span>Short description <small style="display:inline;font-weight:400">(optional)</small></span><input type="text" name="description" value="<%= editing ? editing.description || '' : '' %>" placeholder="One line about what this policy covers"></label>
+  <label class="field"><span><%= editing ? 'Replace the file' : 'Policy file' %></span><input type="file" name="file" accept=".pdf,.doc,.docx" <%= editing ? '' : 'required' %>>
+    <small>PDF or Word, up to 20 MB. PDFs open in the browser; Word files download.<% if (editing) { %> Current file: <a href="/portal/policies/<%= editing.id %>/file" target="_blank"><%= editing.original_name %></a>. Leave empty to keep it.<% } %></small></label>
+  <div class="row-actions">
+    <button class="btn btn-navy"><%= editing ? 'Save changes' : 'Add policy' %></button>
+    <% if (editing) { %><a href="/admin/policies">Cancel</a><% } %>
+  </div>
+</form>
+<% } %>
+<%- include('../partials/admin-footer') %>

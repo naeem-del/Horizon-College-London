@@ -1,0 +1,63 @@
+<%- include('../partials/header') %>
+<%- include('../partials/portal-nav') %>
+<div class="portal-main"><div class="wrap">
+  <div class="welcome">
+    <div><p class="muted" style="margin:0">Student portal</p><h1 style="font-size:2.4rem;margin:0">Hello, <%= user.name.split(' ')[0] %></h1></div>
+    <a class="btn btn-line btn-sm" href="/courses">Find another course</a>
+  </div>
+
+  <% if (deadlines.length) { %>
+    <h2 style="font-size:1.5rem">Assignments to hand in</h2>
+    <div class="panel" style="margin-bottom:28px">
+      <% deadlines.forEach(d => { const ds = dueState(d.due, d.sub_status); %>
+        <div class="submission">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+            <span><a href="/portal/courses/<%= d.course_slug %>/lessons/<%= d.id %>"><strong><%= d.title %></strong></a><br><span class="small muted"><%= d.course_title %>, deadline <%= dueDate(d.due) %></span></span>
+            <span class="status <%= ds.cls %>"><%= d.sub_status === 'resubmit' && ds.text !== 'Overdue' ? 'Resubmit' : ds.text %></span>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <% if (!enrolments.length) { %>
+    <div class="panel empty">
+      <h3>You’re not enrolled on a course yet</h3>
+      <p class="muted">Choose a qualification and send your enrolment — it will appear here once confirmed.</p>
+      <a class="btn btn-gold" href="/courses">Browse courses</a>
+    </div>
+  <% } %>
+
+  <% enrolments.forEach(e => { const open = ['active','completed'].includes(e.status); %>
+    <div class="enrol-card">
+      <div>
+        <span class="status <%= e.status %>"><%= { pending: 'Awaiting confirmation', active: 'In progress', completed: 'Completed', cancelled: 'Cancelled' }[e.status] %></span>
+        <h3><%= e.title %></h3>
+        <p class="small muted" style="margin:0 0 12px"><%= [e.level, e.body_name].filter(Boolean).join(', ') %></p>
+        <% if (open) { %>
+          <div class="bar" role="progressbar" aria-valuenow="<%= e.progress.pct %>" aria-valuemin="0" aria-valuemax="100"><i style="width:<%= e.progress.pct %>%"></i></div>
+          <p class="small muted" style="margin:6px 0 0"><%= e.progress.done %> of <%= e.progress.total %> complete</p>
+        <% } else if (e.status === 'pending') { %>
+          <p class="small" style="margin:0">We’ll open your course once your registration is confirmed.</p>
+        <% } %>
+      </div>
+      <% if (open) { %><a class="btn btn-navy" href="/portal/courses/<%= e.slug %>"><%= e.progress.done ? 'Continue' : 'Start course' %></a><% } %>
+    </div>
+  <% }) %>
+
+  <% if (feedback.length) { %>
+    <h2 style="font-size:1.5rem;margin-top:40px">Recent assessor feedback</h2>
+    <div class="panel">
+      <% feedback.forEach(f => { %>
+        <div class="submission">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <a href="/portal/courses/<%= f.course_slug %>/lessons/<%= f.lesson_id %>"><strong><%= f.lesson_title %></strong></a>
+            <span><% if (f.mark !== null) { %><span class="mark-pill"><%= markText(f.mark, f.total_marks) %></span> <% } %><span class="status <%= f.status %>"><%= f.status === 'accepted' ? 'Accepted' : 'Resubmit' %></span></span>
+          </div>
+          <% if (f.feedback) { %><div class="feedback"><%= f.feedback %></div><% } %>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div></div>
+<%- include('../partials/footer') %>

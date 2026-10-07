@@ -1,0 +1,7 @@
+<div class="portal-bar"><div class="wrap">
+  <a href="/portal" class="<%= path === '/portal' ? 'on' : '' %>">My courses</a>
+  <a href="/portal/policies" class="<%= path === '/portal/policies' ? 'on' : '' %>">Policies</a>
+  <a href="/portal/profile" class="<%= path === '/portal/profile' ? 'on' : '' %>">My details</a>
+  <a href="/courses">Browse courses</a>
+  <form method="post" action="/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link-btn" style="color:#C9D2E6">Log out</button></form>
+</div></div>

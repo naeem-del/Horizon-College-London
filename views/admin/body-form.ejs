@@ -1,0 +1,12 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1><%= body.id ? 'Edit awarding body' : 'Add awarding body' %></h1><a href="/admin/bodies">Back to list</a></div>
+<form class="form-card" method="post" action="/admin/bodies/save" enctype="multipart/form-data">
+  <%- include('../partials/csrf') %><input type="hidden" name="id" value="<%= body.id || '' %>">
+  <label class="field"><span>Name</span><input type="text" name="name" value="<%= body.name || '' %>" required></label>
+  <label class="field"><span>Website</span><input type="url" name="website" value="<%= body.website || '' %>" placeholder="https://"></label>
+  <label class="field"><span>Description</span><textarea name="description"><%= body.description || '' %></textarea><small>Shown on the awarding body’s public page. Leave a blank line between paragraphs.</small></label>
+  <label class="field"><span>Logo</span><input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp,.svg">
+    <% if (body.logo) { %><img src="/uploads/images/<%= body.logo %>" alt="" style="height:50px;margin-top:10px"><% } %></label>
+  <button class="btn btn-navy">Save awarding body</button>
+</form>
+<%- include('../partials/admin-footer') %>

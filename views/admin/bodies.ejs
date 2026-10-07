@@ -1,0 +1,17 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>Awarding bodies</h1><a class="btn btn-gold btn-sm" href="/admin/bodies/new">Add awarding body</a></div>
+<div class="table-wrap"><table>
+  <tr><th>Name</th><th>Courses</th><th>Website</th><th></th></tr>
+  <% bodies.forEach(b => { %>
+    <tr>
+      <td><strong><%= b.name %></strong></td><td><%= b.n %></td>
+      <td><% if (b.website) { %><a href="<%= b.website %>" target="_blank" rel="noopener"><%= b.website.replace(/^https?:\/\//,'') %></a><% } %></td>
+      <td class="row-actions">
+        <a class="btn btn-line btn-sm" href="/admin/bodies/<%= b.id %>/edit">Edit</a>
+        <form method="post" action="/admin/bodies/<%= b.id %>/delete" data-confirm="Delete <%= b.name %>? Its courses will be kept."><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!bodies.length) { %><tr><td colspan="4" class="muted">No awarding bodies yet. Add the organisations you’re approved with.</td></tr><% } %>
+</table></div>
+<%- include('../partials/admin-footer') %>

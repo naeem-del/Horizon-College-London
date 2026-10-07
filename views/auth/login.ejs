@@ -1,0 +1,15 @@
+<%- include('../partials/header') %>
+<div class="auth">
+  <div class="auth-art"><h2>Welcome back.</h2><p>Pick up where you left off — your lessons, evidence and assessor feedback are all in one place.</p></div>
+  <div class="auth-form">
+    <form method="post" action="/login">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h1 style="font-size:2.2rem">Log in</h1>
+      <label class="field"><span>Email</span><input type="email" name="email" value="<%= email %>" autocomplete="email" required autofocus></label>
+      <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn btn-navy" style="width:100%;justify-content:center">Log in</button>
+      <p class="small muted" style="margin-top:18px">New to Horizon? <a href="/register">Create an account</a>. <a href="/forgot-password">Forgotten your password?</a></p>
+    </form>
+  </div>
+</div>
+</main></body></html>

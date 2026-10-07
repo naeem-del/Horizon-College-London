@@ -1,0 +1,45 @@
+<%- include('../partials/admin-header') %>
+<% const staff = kind === 'staff'; %>
+<div class="admin-top"><h1><%= staff ? 'Staff' : 'Learners' %></h1>
+  <form method="get" class="inline-form"><input type="search" name="q" value="<%= q %>" placeholder="Search name or email" style="width:260px"><button class="btn btn-line btn-sm">Search</button></form>
+</div>
+<div class="table-wrap"><table>
+  <tr><th>Name</th><th>Email</th><% if (staff) { %><th>Role</th><% } else { %><th>Courses</th><% } %><th>Joined</th><th></th></tr>
+  <% students.forEach(s => { %>
+    <tr><td><span class="person"><%- include('../partials/avatar', { who: s }) %><strong><%= s.name %></strong></span></td><td><%= s.email %></td>
+    <% if (staff) { %><td><span class="status completed"><%= s.role === 'tutor' ? 'Tutor / assessor' : 'Admin' %></span></td><% } else { %><td><%= s.courses %></td><% } %>
+    <td><%= date(s.created_at) %></td>
+    <td><a class="btn btn-line btn-sm" href="/admin/students/<%= s.id %>">Open</a></td></tr>
+  <% }) %>
+  <% if (!students.length) { %><tr><td colspan="5" class="muted"><%= q ? 'No accounts match.' : (staff ? 'No staff accounts yet.' : 'No learners yet.') %></td></tr><% } %>
+</table></div>
+<% if (user.role === 'admin') { %>
+<h3 style="margin-top:32px"><%= staff ? 'Add a staff member' : 'Add a learner' %></h3>
+<% if (staff) { %>
+<form class="form-card" method="post" action="/admin/students" enctype="multipart/form-data">
+  <%- include('../partials/csrf') %>
+  <div class="two">
+    <label class="field"><span>First name</span><input type="text" name="first_name" autocomplete="off" required></label>
+    <label class="field"><span>Last name</span><input type="text" name="last_name" autocomplete="off" required></label>
+    <label class="field"><span>Email</span><input type="email" name="email" autocomplete="off" required><small>Their set-password link is sent here.</small></label>
+    <label class="field"><span>Phone number</span><input type="tel" name="phone" autocomplete="off"></label>
+  </div>
+  <label class="field"><span>Address</span><textarea name="address" rows="2"></textarea></label>
+  <div class="two">
+    <label class="field"><span>Postcode</span><input type="text" name="postcode" autocomplete="off" style="text-transform:uppercase"></label>
+    <label class="field"><span>Role</span><select name="role"><option value="tutor">Tutor / assessor</option><option value="admin">Admin</option></select></label>
+  </div>
+  <label class="field"><span>Profile picture</span><input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"><small>JPG, PNG or WebP. A square photo works best.</small></label>
+  <button class="btn btn-navy">Create account and email invitation</button>
+</form>
+<% } else { %>
+<form class="form-card inline-form" method="post" action="/admin/students" style="max-width:none">
+  <%- include('../partials/csrf') %>
+  <label class="field"><span>Name</span><input type="text" name="name" required></label>
+  <label class="field"><span>Email</span><input type="email" name="email" required></label>
+  <input type="hidden" name="role" value="student">
+  <button class="btn btn-navy">Create account</button>
+</form>
+<% } %>
+<% } %>
+<%- include('../partials/admin-footer') %>

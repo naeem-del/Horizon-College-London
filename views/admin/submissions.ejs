@@ -1,0 +1,46 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>Evidence review</h1></div>
+<div class="tabs"><a class="<%= show === 'open' ? 'on' : '' %>" href="?show=open">Waiting for review</a><a class="<%= show === 'all' ? 'on' : '' %>" href="?show=all">All evidence</a></div>
+<% rows.forEach(s => { %>
+  <div class="review">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div><strong><a href="/admin/students/<%= s.student_id %>"><%= s.student %></a></strong>, <%= s.lesson_title %><div class="small muted"><%= s.course_title %>, uploaded <%= date(s.created_at) %><% if (s.due) { %>, deadline <%= dueDate(s.due) %><% } %>
+        <% if (s.due && s.created_at.slice(0, 10) > s.due) { %> <span class="status resubmit">Late</span><% } %></div></div>
+      <span class="row-actions"><% if (s.mark !== null) { %><span class="mark-pill"><%= markText(s.mark, s.total_marks) %></span><% } %><span class="status <%= s.status %>"><%= s.status %></span></span>
+    </div>
+    <p style="margin:10px 0"><a class="attachment" style="margin:0" href="/admin/evidence/<%= s.id %>">Download <%= s.original_name %></a></p>
+    <% if (s.note) { %><p class="small"><strong>Learner’s note:</strong> <%= s.note %></p><% } %>
+    <% if (s.mark !== null) { %>
+    <div class="marked-record">
+      <p class="marked-head"><span class="lock" aria-hidden="true">&#128274;</span> Marked<%= s.marker ? ` by ${s.marker}` : '' %><%= s.marked_at ? ` on ${date(s.marked_at)}` : '' %>. This record is locked.</p>
+      <dl class="facts">
+        <dt>Mark</dt><dd><strong><%= markText(s.mark, s.total_marks) %></strong></dd>
+        <dt>Decision</dt><dd><%= s.status === 'accepted' ? 'Accepted' : s.status === 'resubmit' ? 'Asked to resubmit' : 'Awaiting decision' %></dd>
+        <dt>Feedback</dt><dd style="white-space:pre-line"><%= s.feedback || '—' %></dd>
+      </dl>
+      <% if (user.role === 'admin') { %>
+        <form method="post" action="/admin/submissions/<%= s.id %>/unlock" data-confirm="Clear this mark so the work can be marked again? Only do this to correct a mistake."><%- include('../partials/csrf') %><button class="link-btn small">Unlock for re-marking (admin)</button></form>
+      <% } %>
+    </div>
+    <% } else { %>
+    <form method="post" action="/admin/submissions/<%= s.id %>" class="mark-form"><%- include('../partials/csrf') %>
+      <div class="mark-row">
+        <label class="field"><span>Mark</span><span class="mark-input"><input type="number" name="mark" min="0" <% if (s.total_marks) { %>max="<%= s.total_marks %>"<% } %> step="0.5" value="<%= s.mark ?? '' %>" aria-label="Mark"><% if (s.total_marks) { %><span>/ <%= markText(s.total_marks) %></span><% } %></span>
+          <small><%= s.total_marks ? 'Optional.' : 'No total set for this assignment. Add one by editing the assignment.' %></small></label>
+        <label class="field" style="flex:1"><span>Feedback to learner</span><textarea name="feedback"><%= s.feedback || '' %></textarea></label>
+      </div>
+      <div class="row-actions"><button class="btn btn-gold btn-sm" name="status" value="accepted">Accept evidence</button><button class="btn btn-line btn-sm" name="status" value="resubmit">Ask for resubmission</button></div>
+      <p class="small muted" style="margin:8px 0 0">Once you save a mark, the mark, feedback and decision are locked and can’t be changed.</p>
+    </form>
+    <% } %>
+  </div>
+<% }) %>
+<script>
+  // Marks are final, so confirm before saving one
+  document.querySelectorAll('.mark-form').forEach(f => f.addEventListener('submit', e => {
+    const m = f.mark.value.trim();
+    if (m !== '' && !confirm('Save a mark of ' + m + (f.mark.max ? ' / ' + f.mark.max : '') + '? Once saved it is locked and can’t be changed.')) e.preventDefault();
+  }));
+</script>
+<% if (!rows.length) { %><div class="panel empty"><h3>All caught up</h3><p class="muted">New evidence from learners will appear here.</p></div><% } %>
+<%- include('../partials/admin-footer') %>

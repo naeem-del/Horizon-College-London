@@ -1,0 +1,29 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top"><h1>Dashboard</h1><% if (user.role === 'admin') { %><a class="btn btn-gold btn-sm" href="/admin/courses/new">Add course</a><% } %></div>
+<div class="stats">
+  <a class="stat" href="/admin/students"><b><%= stats.students %></b><span>Learners</span></a>
+  <a class="stat" href="/admin/enrolments?status=active"><b><%= stats.active %></b><span>Active enrolments</span></a>
+  <a class="stat <%= stats.pending ? 'alert' : '' %>" href="/admin/enrolments"><b><%= stats.pending %></b><span>Enrolments to confirm</span></a>
+  <a class="stat <%= stats.enquiries ? 'alert' : '' %>" href="/admin/enquiries"><b><%= stats.enquiries %></b><span>New enquiries</span></a>
+  <a class="stat <%= stats.toReview ? 'alert' : '' %>" href="/admin/submissions"><b><%= stats.toReview %></b><span>Evidence to review</span></a>
+  <a class="stat" href="/admin/courses"><b><%= stats.courses %></b><span>Courses</span></a>
+</div>
+<div class="cols-2">
+  <div>
+    <h3>Latest enquiries</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Name</th><th>Course</th><th>Status</th></tr>
+      <% recentEnquiries.forEach(q => { %><tr><td><%= q.name %><div class="small muted"><%= date(q.created_at) %></div></td><td><%= q.course_title || 'General' %></td><td><span class="status <%= q.status %>"><%= q.status %></span></td></tr><% }) %>
+      <% if (!recentEnquiries.length) { %><tr><td colspan="3" class="muted">No enquiries yet.</td></tr><% } %>
+    </table></div>
+  </div>
+  <div>
+    <h3>Evidence waiting</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Learner</th><th>Task</th><th></th></tr>
+      <% recentSubs.forEach(s => { %><tr><td><%= s.student %></td><td><%= s.lesson_title %></td><td><a href="/admin/submissions">Review</a></td></tr><% }) %>
+      <% if (!recentSubs.length) { %><tr><td colspan="3" class="muted">Nothing waiting for review.</td></tr><% } %>
+    </table></div>
+  </div>
+</div>
+<%- include('../partials/admin-footer') %>

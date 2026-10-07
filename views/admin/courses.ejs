@@ -1,0 +1,24 @@
+<%- include('../partials/admin-header') %>
+<% const admin = user.role === 'admin'; %>
+<div class="admin-top"><h1><%= title %></h1><% if (admin) { %><a class="btn btn-gold btn-sm" href="/admin/courses/new">Add course</a><% } %></div>
+<% if (!admin) { %><p class="muted">Courses you’ve been assigned to. Open one to add lessons, videos and assignments.</p><% } %>
+<div class="table-wrap"><table>
+  <tr><th>Course</th><th>Awarding body</th><th>Staff</th><th>Lessons</th><th>Learners</th><th>Status</th><th></th></tr>
+  <% courses.forEach(c => { %>
+    <tr>
+      <td><strong><%= c.title %></strong><div class="small muted"><%= c.level %></div></td>
+      <td><%= c.body_name || '—' %></td><td class="small"><%= c.staff || '—' %></td><td><%= c.lessons %></td><td><%= c.learners %></td>
+      <td><span class="status <%= c.published ? 'active' : '' %>"><%= c.published ? 'Published' : 'Draft' %></span><% if (c.featured) { %> <span class="status completed">Featured</span><% } %></td>
+      <td class="row-actions">
+        <a class="btn btn-navy btn-sm" href="/admin/courses/<%= c.id %>/content">Content</a>
+        <% if (admin) { %>
+        <a class="btn btn-line btn-sm" href="/admin/courses/<%= c.id %>/edit">Edit</a>
+        <a class="btn btn-line btn-sm" href="/courses/<%= c.slug %>" target="_blank">View</a>
+        <form method="post" action="/admin/courses/<%= c.id %>/delete" data-confirm="Delete this course, its lessons and all learner progress? This can’t be undone."><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm">Delete</button></form>
+        <% } %>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!courses.length) { %><tr><td colspan="7" class="muted"><%= admin ? 'No courses yet.' : 'You haven’t been assigned to a course yet. Ask an administrator to add you.' %></td></tr><% } %>
+</table></div>
+<%- include('../partials/admin-footer') %>

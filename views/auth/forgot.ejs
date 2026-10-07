@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+<div class="auth">
+  <div class="auth-art"><h2>Locked out?</h2><p>We’ll email you a link to choose a new password.</p></div>
+  <div class="auth-form">
+    <% if (done) { %>
+    <div style="max-width:400px">
+      <h1 style="font-size:2.2rem">Check your email</h1>
+      <p class="muted">If <strong><%= email %></strong> has an account, we’ve sent a link to reset the password. It works for 1 hour. Check your spam folder if it doesn’t arrive.</p>
+      <a href="/login">Back to log in</a>
+    </div>
+    <% } else { %>
+    <form method="post" action="/forgot-password">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h1 style="font-size:2.2rem">Forgotten password</h1>
+      <label class="field"><span>Email</span><input type="email" name="email" value="<%= email %>" autocomplete="email" required autofocus></label>
+      <button class="btn btn-navy" style="width:100%;justify-content:center">Email me a reset link</button>
+      <p class="small muted" style="margin-top:18px"><a href="/login">Back to log in</a></p>
+    </form>
+    <% } %>
+  </div>
+</div>
+</main></body></html>

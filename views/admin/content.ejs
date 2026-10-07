@@ -1,0 +1,69 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top">
+  <div><a href="/admin/courses" class="small"><%= user.role === 'admin' ? 'Courses' : 'My courses' %></a><h1><%= course.title %></h1></div>
+  <div class="row-actions">
+    <% if (user.role === 'admin') { %><a class="btn btn-line btn-sm" href="/admin/courses/<%= course.id %>/edit">Course details</a><% } %>
+    <a class="btn btn-line btn-sm" href="/portal/courses/<%= course.slug %>" target="_blank">Preview as learner</a>
+  </div>
+</div>
+
+<div class="panel course-staff">
+  <h3>Course staff</h3>
+  <p class="small muted">Staff on this course can add lessons, videos and assignments, set deadlines and review learners’ evidence.</p>
+  <div class="staff-chips">
+    <% staff.forEach(s => { %>
+      <span class="staff-chip"><%- include('../partials/avatar', { who: s }) %><a href="/admin/students/<%= s.id %>"><%= s.name %></a>
+        <% if (user.role === 'admin') { %><form method="post" action="/admin/courses/<%= course.id %>/staff/<%= s.id %>/remove" data-confirm="Remove <%= s.name %> from this course?"><%- include('../partials/csrf') %><button class="link-btn" aria-label="Remove <%= s.name %>">Remove</button></form><% } %>
+      </span>
+    <% }) %>
+    <% if (!staff.length) { %><span class="muted small">No staff assigned yet.</span><% } %>
+  </div>
+  <% if (user.role === 'admin' && otherStaff.length) { %>
+    <form method="post" action="/admin/courses/<%= course.id %>/staff" class="inline-form" style="margin-top:14px"><%- include('../partials/csrf') %>
+      <label class="field" style="max-width:320px"><span>Assign a staff member</span><select name="user_id"><% otherStaff.forEach(s => { %><option value="<%= s.id %>"><%= s.name %> (<%= s.role === 'tutor' ? 'tutor' : 'admin' %>)</option><% }) %></select></label>
+      <button class="btn btn-navy btn-sm">Assign</button>
+    </form>
+  <% } %>
+</div>
+
+<p class="muted">Organise the course into modules (units), then add lessons and assignments. Assignments let learners upload work for review, with a deadline.</p>
+
+<% modules.forEach((m, i) => { %>
+  <div class="module-box">
+    <form class="module-head" method="post" action="/admin/modules/<%= m.id %>">
+      <%- include('../partials/csrf') %>
+      <input type="text" name="title" value="<%= m.title %>" aria-label="Module title">
+      <button class="btn btn-line btn-sm">Rename</button>
+      <% if (i > 0) { %><button class="btn btn-line btn-sm" name="move" value="up" title="Move up">Up</button><% } %>
+      <% if (i < modules.length - 1) { %><button class="btn btn-line btn-sm" name="move" value="down" title="Move down">Down</button><% } %>
+      <button class="btn btn-danger btn-sm" name="delete" value="1" onclick="return confirm('Delete this module and all its lessons?')">Delete</button>
+    </form>
+    <% m.lessons.forEach(l => { %>
+      <div class="lesson-row">
+        <span>
+          <span class="kind <%= l.kind %>"><%= l.kind === 'assignment' ? 'Assignment' : 'Lesson' %></span><%= l.title %>
+          <% if (l.video_file || l.video_url) { %><span class="small muted"> · video</span><% } %>
+          <% if (l.scorm_folder) { %><span class="kind scorm" style="margin:0 0 0 8px">SCORM <%= l.scorm_version %></span><% } %>
+          <% if (l.kind === 'assignment') { %>
+            <span class="small muted"> · <%= l.assign_to === 'selected' ? `${l.picked} selected learner${l.picked === 1 ? '' : 's'}` : 'all learners' %><%= l.due_date ? ` · due ${dueDate(l.due_date)}` : '' %><%= l.total_marks ? ` · out of ${markText(l.total_marks)}` : '' %></span>
+          <% } %>
+        </span>
+        <span class="row-actions">
+          <a class="btn btn-line btn-sm" href="/admin/lessons/<%= l.id %>/edit">Edit</a>
+          <form method="post" action="/admin/lessons/<%= l.id %>/delete" data-confirm="Delete this <%= l.kind === 'assignment' ? 'assignment' : 'lesson' %>?"><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm">Delete</button></form>
+        </span>
+      </div>
+    <% }) %>
+    <div class="lesson-row add-row">
+      <a href="/admin/modules/<%= m.id %>/lessons/new">+ Add lesson or video</a>
+      <a href="/admin/modules/<%= m.id %>/lessons/new?kind=assignment">+ Set an assignment</a>
+    </div>
+  </div>
+<% }) %>
+
+<form class="form-card inline-form" method="post" action="/admin/courses/<%= course.id %>/modules" style="max-width:none">
+  <%- include('../partials/csrf') %>
+  <label class="field"><span>New module</span><input type="text" name="title" placeholder="e.g. Unit 1: Manage personal and professional development" required></label>
+  <button class="btn btn-navy">Add module</button>
+</form>
+<%- include('../partials/admin-footer') %>

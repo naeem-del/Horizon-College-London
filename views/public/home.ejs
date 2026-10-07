@@ -1,0 +1,139 @@
+<%- include('../partials/header') %>
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="hero-kicker">Build skills. Gain qualifications.</p>
+      <h1>Move your career forward.</h1>
+      <p class="hero-lede">Regulated, career-focused qualifications you can study online around your job — with a dedicated assessor from enrolment to certificate.</p>
+      <div class="hero-actions">
+        <a class="btn btn-navy" href="/courses">Browse courses</a>
+        <a class="btn btn-line" href="/enrol">Enrol now</a>
+      </div>
+    </div>
+    <div class="horizon" aria-hidden="true">
+      <svg viewBox="0 0 560 420">
+        <g class="sun">
+          <circle cx="280" cy="420" r="330" fill="none" stroke="#14213D" stroke-opacity=".07" stroke-width="2"/>
+          <circle cx="280" cy="420" r="285" fill="none" stroke="#14213D" stroke-opacity=".11" stroke-width="2"/>
+          <circle cx="280" cy="420" r="240" fill="#F2A93B"/>
+          <circle cx="280" cy="420" r="190" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/>
+        </g>
+      </svg>
+      <img class="hero-student" src="/images/hero-student.webp" alt="" width="733" height="767" fetchpriority="high">
+      <div class="horizon-facts">
+        <div><b><%= counts.courses %></b><span>courses</span></div>
+        <div><b><%= counts.bodies %></b><span><%= counts.bodies === 1 ? 'awarding body' : 'awarding bodies' %></span></div>
+        <div><b>Online</b><span>study anywhere</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-line"></div>
+</section>
+
+<section class="pillars">
+  <div class="wrap">
+    <div class="pillar-grid">
+      <article class="pillar">
+        <h3>Recognised Qualifications</h3>
+        <p>Study towards industry-relevant qualifications designed to support your professional development and career progression.</p>
+        <a class="pillar-link" href="/courses">Explore courses <span aria-hidden="true">&rarr;</span></a>
+      </article>
+      <article class="pillar">
+        <h3>Career-Focused Learning</h3>
+        <p>Develop practical knowledge and skills that can be applied within real working environments.</p>
+        <a class="pillar-link" href="/courses">Explore courses <span aria-hidden="true">&rarr;</span></a>
+      </article>
+      <article class="pillar">
+        <h3>Dedicated Learner Support</h3>
+        <p>From enrolment to completion, our team is here to guide and support you throughout your learning journey.</p>
+        <a class="pillar-link" href="/courses">Explore courses <span aria-hidden="true">&rarr;</span></a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<% if (bodies.length) { %>
+<%
+  // Repeat the list so one set always fills the screen, then render it twice for a seamless loop.
+  const reps = Math.ceil(12 / bodies.length);
+  const set = Array.from({ length: reps }, () => bodies).flat();
+%>
+<section class="bodies-band">
+  <div class="wrap"><h2>Approved awarding organisations</h2></div>
+  <div class="badge-marquee">
+    <div class="badge-track">
+      <% [0, 1].forEach(copy => { set.forEach((b, i) => { const dup = copy > 0 || i >= bodies.length; %>
+        <a class="body-badge" href="/awarding-bodies/<%= b.slug %>" title="<%= b.name %>"<% if (dup) { %> aria-hidden="true" tabindex="-1"<% } %>>
+          <% if (b.logo) { %><img src="/uploads/images/<%= b.logo %>" alt="<%= dup ? '' : b.name %>" loading="lazy"><% } else { %><span class="badge-mono"><b><%= initials(b.name) %></b><small><%= b.name %></small></span><% } %>
+        </a>
+      <% }) }) %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<section class="section about">
+  <div class="wrap">
+    <img class="about-photo" src="/images/about-students.png" alt="Students studying together in a library" width="640" height="632" loading="lazy">
+    <div class="about-copy">
+      <h2>Learn New Skills To Go <span>Ahead For Your Career.</span></h2>
+      <p class="about-lede">Our programmes are designed for learners who want more than just a certificate. We focus on building knowledge, practical competence and professional confidence that can support progression within your chosen industry.</p>
+      <div class="about-card">
+        <span class="about-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></svg></span>
+        <div><h3>Our Mission</h3><p>To provide accessible, career-focused education that equips learners with the knowledge, practical skills and confidence they need to progress professionally.</p></div>
+      </div>
+      <div class="about-card">
+        <span class="about-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></span>
+        <div><h3>Our Vision</h3><p>To become a trusted destination for vocational and professional education, helping learners transform ambition into meaningful career progression.</p></div>
+      </div>
+      <a class="btn btn-gold about-btn" href="/courses">Discover More</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <div><h2>Popular qualifications</h2></div>
+      <p>Each course is assessed against your real work, so what you learn applies straight away. <a href="/courses">See all courses</a></p>
+    </div>
+    <% if (featured.length) { %>
+      <div class="grid"><% featured.forEach(c => { %><%- include('../partials/course-card', { c }) %><% }) %></div>
+    <% } else { %>
+      <p class="muted">Courses will appear here once they’re published. Mark a course as featured in the admin area to show it here.</p>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section-mist">
+  <div class="wrap">
+    <div class="section-head"><h2>Learning designed around your future</h2></div>
+    <div class="why">
+      <div><h3>Practical learning</h3><p>Build skills through structured activities and evidence from your own workplace, not abstract exams.</p></div>
+      <div><h3>Support throughout</h3><p>A named assessor guides you from enrolment through assessment and completion, with feedback on every piece of evidence.</p></div>
+      <div><h3>Recognised progression</h3><p>Ofqual-regulated qualifications that open the door to higher levels, promotion and further professional study.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head"><h2>How enrolment works</h2></div>
+    <ol class="steps">
+      <li><h3>Choose a course</h3><p>Compare levels, awarding bodies and entry requirements.</p></li>
+      <li><h3>Send your details</h3><p>Complete the short enrolment form. It takes two minutes.</p></li>
+      <li><h3>Talk to an advisor</h3><p>We confirm the right level for you and register you with the awarding body.</p></li>
+      <li><h3>Start learning</h3><p>Log in to your student portal and begin your first unit.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="cta-band">
+      <div><h2>Not sure which level fits?</h2><p>Tell us about your role and we’ll recommend a qualification.</p></div>
+      <a class="btn btn-gold" href="/enrol">Start your enrolment</a>
+    </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>
