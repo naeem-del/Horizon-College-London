@@ -1,6 +1,6 @@
 <%- include('../partials/admin-header') %>
 <div class="admin-top"><h1><%= course.id ? 'Edit course' : 'Add course' %></h1><a href="/admin/courses">Back to courses</a></div>
-<form class="form-card course-form" method="post" action="/admin/courses/save" enctype="multipart/form-data">
+<form class="form-card course-form" method="post" action="/admin/courses/save" enctype="multipart/form-data" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %><input type="hidden" name="id" value="<%= course.id || '' %>">
   <% if (!course.id) { %>
     <fieldset class="mode-pick">
@@ -35,8 +35,8 @@
   <label class="field"><span>Description</span><textarea name="description" style="min-height:180px"><%= course.description || '' %></textarea></label>
   <label class="field"><span>Who it’s for / entry requirements</span><textarea name="entry_requirements"><%= course.entry_requirements || '' %></textarea></label>
   <label class="field"><span>How it’s assessed</span><textarea name="assessment"><%= course.assessment || '' %></textarea></label>
-  <label class="field"><span>Cover image</span><input type="file" name="image" accept=".png,.jpg,.jpeg,.webp">
-    <% if (course.image) { %><img src="/uploads/images/<%= course.image %>" alt="" style="height:90px;margin-top:10px;border-radius:8px"><% } %></label>
+  <label class="field"><span>Cover image</span><input type="file" data-upload="course-image" accept=".png,.jpg,.jpeg,.webp">
+    <% if (course.image) { %><img src="<%= fileUrl('images', course.image) %>" alt="" style="height:90px;margin-top:10px;border-radius:8px"><% } %></label>
   </div>
   <p class="small muted scorm-only">You can add the website details (level, awarding body, description, cover image) afterwards with Edit.</p>
   <label class="check"><input type="checkbox" name="published" <%= course.published ? 'checked' : '' %>> Published on the website</label>

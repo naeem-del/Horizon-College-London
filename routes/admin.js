@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db, slugify, toId } = require('../db');
 const fs = require('fs');
-const { requireRole, flash, csrf, uploadImage, uploadPhoto, uploadLesson, uploadPolicy, uploadCourse } = require('../middleware');
+const { requireRole, flash, csrf, uploadScorm } = require('../middleware');
+const storage = require('../storage');
 const links = require('../password-links');
 const { sendMail } = require('../mailer');
 const { dueDate, markText } = require('../helpers');
@@ -32,6 +33,16 @@ router.use(async (req, res, next) => {
       (SELECT COUNT(*) FROM submissions s JOIN lessons l ON l.id=s.lesson_id JOIN modules m ON m.id=l.module_id
         JOIN courses c ON c.id=m.course_id WHERE s.reviewed_at IS NULL AND ${myCourses(req)}) AS submissions`);
   next();
+});
+
+// ---------- Direct uploads ----------
+// Signs a one-time storage link for a file the browser is about to upload (see public/js/direct-upload.js)
+router.post('/uploads/sign', async (req, res) => {
+  const rule = storage.UPLOADS[req.body.purpose];
+  if (!rule || rule.who === 'learner' || (rule.who === 'admin' && !isAdmin(req))) return res.status(403).json({ error: 'You can’t upload this kind of file here.' });
+  const problem = storage.refuse(req.body.purpose, req.body.filename, Number(req.body.size));
+  if (problem) return res.status(422).json({ error: problem });
+  res.json(await storage.signUpload(req.body.purpose, req.body.filename));
 });
 
 async function uniqueSlug(table, base, id = 0) {
@@ -71,28 +82,32 @@ router.get('/bodies/:id/edit', adminOnly, async (req, res, next) => {
   if (!body) return next();
   res.render('admin/body-form', { title: `Edit ${body.name}`, body });
 });
-router.post('/bodies/save', adminOnly, uploadImage.single('logo'), csrf, async (req, res) => {
+router.post('/bodies/save', adminOnly, async (req, res) => {
   const id = toId(req.body.id);
   const name = (req.body.name || '').trim();
-  if (!name) { flash(req, 'error', 'Enter the awarding body’s name.'); return res.redirect(back(req, '/admin/bodies')); }
+  const logo = await storage.receive(req.body, 'logo');
+  if (!name) { await removeUpload('images', logo && logo.filename); flash(req, 'error', 'Enter the awarding body’s name.'); return res.redirect(back(req, '/admin/bodies')); }
+  const old = id ? await db.get('SELECT logo FROM awarding_bodies WHERE id=?', id) : null;
   const data = { name, slug: await uniqueSlug('awarding_bodies', name, id), website: req.body.website || '', description: req.body.description || '' };
   try {
     if (id) {
       await db.run('UPDATE awarding_bodies SET name=@name, slug=@slug, website=@website, description=@description WHERE id=@id', { ...data, id });
-      if (req.file) await db.run('UPDATE awarding_bodies SET logo=? WHERE id=?', req.file.filename, id);
+      if (logo) await db.run('UPDATE awarding_bodies SET logo=? WHERE id=?', logo.filename, id);
     } else {
-      await db.run('INSERT INTO awarding_bodies (name,slug,website,description,logo) VALUES (@name,@slug,@website,@description,@logo)', { ...data, logo: req.file ? req.file.filename : null });
+      await db.run('INSERT INTO awarding_bodies (name,slug,website,description,logo) VALUES (@name,@slug,@website,@description,@logo)', { ...data, logo: logo ? logo.filename : null });
     }
   } catch (err) {
+    await removeUpload('images', logo && logo.filename);
     if (!db.isUnique(err)) throw err;
-    removeUpload('images', req.file && req.file.filename);
     flash(req, 'error', tryAgain); return res.redirect(back(req, '/admin/bodies'));
   }
+  if (logo && old) await removeUpload('images', old.logo);
   flash(req, 'success', `${name} saved.`);
   res.redirect('/admin/bodies');
 });
 router.post('/bodies/:id/delete', adminOnly, async (req, res) => {
-  await db.run('DELETE FROM awarding_bodies WHERE id=?', req.params.id);
+  const gone = await db.get('DELETE FROM awarding_bodies WHERE id=? RETURNING logo', req.params.id);
+  if (gone) await removeUpload('images', gone.logo);
   flash(req, 'success', 'Awarding body deleted. Its courses are kept without an awarding body.');
   res.redirect('/admin/bodies');
 });
@@ -113,22 +128,22 @@ router.get('/courses/:id/edit', adminOnly, async (req, res, next) => {
   if (!course) return next();
   res.render('admin/course-form', { title: `Edit course`, course, bodies: await bodyList() });
 });
-router.post('/courses/save', adminOnly, uploadCourse, csrf, async (req, res) => {
+router.post('/courses/save', adminOnly, uploadScorm, csrf, async (req, res) => {
   const id = toId(req.body.id);
   const b = req.body;
-  const image = req.files && req.files.image && req.files.image[0], pkg = req.files && req.files.scorm && req.files.scorm[0];
+  const image = await storage.receive(b, 'course-image'), pkg = req.file;
   const fromScorm = !id && b.mode === 'scorm';
-  const reject = msg => {
-    removeUpload('images', image && image.filename); removeUpload('scorm', pkg && pkg.filename);
+  const reject = async msg => {
+    await removeUpload('images', image && image.filename); await removeUpload('scorm', pkg && pkg.filename);
     flash(req, 'error', msg); return res.redirect(back(req, '/admin/courses'));
   };
-  if (pkg && !fromScorm) removeUpload('scorm', pkg.filename);
+  if (pkg && !fromScorm) await removeUpload('scorm', pkg.filename);
   // "Upload a SCORM package": unzip it first; the course title comes from the package unless one was typed
   let installed = null;
   if (fromScorm) {
     if (!pkg) return reject('Choose the SCORM package (.zip) to upload.');
     try { installed = scorm.install(pkg.path); } catch (err) {
-      removeUpload('images', image && image.filename);
+      await removeUpload('images', image && image.filename);
       flash(req, 'error', `The course wasn’t added: ${err.message}`); return res.redirect(back(req, '/admin/courses'));
     }
     if (!(b.title || '').trim()) b.title = installed.title || path.basename(pkg.originalname, path.extname(pkg.originalname));
@@ -142,6 +157,7 @@ router.post('/courses/save', adminOnly, uploadCourse, csrf, async (req, res) => 
     published: b.published ? 1 : 0, featured: b.featured ? 1 : 0, sequential: b.sequential ? 1 : 0,
   };
   let courseId = id;
+  const oldImage = id && image ? ((await db.get('SELECT image FROM courses WHERE id=?', id)) || {}).image : null;
   try {
     // The course and (for a package) its modules and lessons are saved together or not at all
     await db.tx(async t => {
@@ -170,9 +186,10 @@ router.post('/courses/save', adminOnly, uploadCourse, csrf, async (req, res) => 
     });
   } catch (err) {
     if (installed) await scorm.remove(installed.folder);
-    if (!db.isUnique(err)) throw err;
+    if (!db.isUnique(err)) { await removeUpload('images', image && image.filename); throw err; }
     return reject(tryAgain);
   }
+  await removeUpload('images', oldImage);
   if (installed) {
     const n = installed.units.length;
     flash(req, 'success', `Course added from the SCORM ${installed.version} package: ${n} unit${n === 1 ? '' : 's'} and ${installed.count} lesson${installed.count === 1 ? '' : 's'}, set up from the package. Use Edit to fill in the course details for the website.`);
@@ -182,9 +199,13 @@ router.post('/courses/save', adminOnly, uploadCourse, csrf, async (req, res) => 
   res.redirect(id ? '/admin/courses' : `/admin/courses/${courseId}/content`);
 });
 router.post('/courses/:id/delete', adminOnly, async (req, res) => {
-  const packages = await db.all('SELECT DISTINCT l.scorm_folder FROM lessons l JOIN modules m ON m.id=l.module_id WHERE m.course_id=? AND l.scorm_folder IS NOT NULL', req.params.id);
-  await db.run('DELETE FROM courses WHERE id=?', req.params.id);
-  for (const p of packages) await scorm.remove(p.scorm_folder);
+  // The course's files go too: its cover image and every lesson's resource, video and SCORM package
+  const lessons = await db.all('SELECT l.attachment, l.video_file, l.scorm_folder FROM lessons l JOIN modules m ON m.id=l.module_id WHERE m.course_id=?', req.params.id);
+  const gone = await db.get('DELETE FROM courses WHERE id=? RETURNING image', req.params.id);
+  if (gone) await removeUpload('images', gone.image);
+  await removeUpload('files', ...lessons.map(l => l.attachment));
+  await removeUpload('videos', ...lessons.map(l => l.video_file));
+  for (const folder of new Set(lessons.map(l => l.scorm_folder).filter(Boolean))) await scorm.remove(folder);
   flash(req, 'success', 'Course deleted.');
   res.redirect('/admin/courses');
 });
@@ -260,7 +281,11 @@ router.post('/modules/:id', async (req, res) => {
 const courseLearners = courseId => db.all(`SELECT u.id, u.name, u.email, e.status, e.batch_id FROM enrolments e JOIN users u ON u.id=e.user_id
   WHERE e.course_id=? AND e.status<>'cancelled' ORDER BY u.name`, courseId);
 const lessonCourse = lessonId => db.get('SELECT m.course_id FROM lessons l JOIN modules m ON m.id=l.module_id WHERE l.id=?', lessonId);
-const removeUpload = (folder, file) => { if (file) fs.unlink(path.join(__dirname, '..', 'uploads', folder, path.basename(file)), () => {}); };
+// Deletes uploaded files from storage (SCORM zips, still received by this server, are on local disk)
+async function removeUpload(folder, ...files) {
+  if (folder !== 'scorm') return storage.remove(folder, ...files);
+  for (const file of files.filter(Boolean)) await fs.promises.unlink(path.join(__dirname, '..', 'uploads', 'scorm', path.basename(file))).catch(() => {});
+}
 const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
 
 async function renderLessonForm(res, module, lesson) {
@@ -289,16 +314,16 @@ router.get('/lessons/:id/edit', async (req, res, next) => {
   if (!(await teaches(req, module.course_id))) return noAccess(res);
   await renderLessonForm(res, module, lesson);
 });
-router.post('/lessons/save', uploadLesson, csrf, async (req, res) => {
-  const files = req.files || {};
-  const attachment = files.attachment && files.attachment[0], video = files.video && files.video[0], pkg = files.scorm && files.scorm[0];
-  const discard = () => { removeUpload('files', attachment && attachment.filename); removeUpload('videos', video && video.filename); removeUpload('scorm', pkg && pkg.filename); };
+router.post('/lessons/save', uploadScorm, csrf, async (req, res) => {
+  const [attachment, video] = await Promise.all([storage.receive(req.body, 'attachment'), storage.receive(req.body, 'video')]);
+  const pkg = req.file;
+  const discard = () => Promise.all([removeUpload('files', attachment && attachment.filename), removeUpload('videos', video && video.filename), removeUpload('scorm', pkg && pkg.filename)]);
   const id = toId(req.body.id);
   const module = await db.get('SELECT * FROM modules WHERE id=?', toId(req.body.module_id));
   const existing = id ? await db.get('SELECT * FROM lessons WHERE id=?', id) : null;
-  if (!module || (id && !existing)) { discard(); return res.redirect('/admin/courses'); }
+  if (!module || (id && !existing)) { await discard(); return res.redirect('/admin/courses'); }
   // Both the target module and (when editing) the lesson's current course must be one this user teaches
-  if (!(await teaches(req, module.course_id)) || (existing && !(await teaches(req, (await lessonCourse(id)).course_id)))) { discard(); return noAccess(res); }
+  if (!(await teaches(req, module.course_id)) || (existing && !(await teaches(req, (await lessonCourse(id)).course_id)))) { await discard(); return noAccess(res); }
 
   const b = req.body;
   const kind = b.kind === 'assignment' ? 'assignment' : 'lesson';
@@ -306,11 +331,11 @@ router.post('/lessons/save', uploadLesson, csrf, async (req, res) => {
   let installed = null;
   if (pkg && kind === 'lesson') {
     try { installed = scorm.install(pkg.path); } catch (err) {
-      removeUpload('files', attachment && attachment.filename); removeUpload('videos', video && video.filename);
+      await removeUpload('files', attachment && attachment.filename); await removeUpload('videos', video && video.filename);
       flash(req, 'error', `The SCORM package wasn’t added: ${err.message} Nothing was saved.`);
       return res.redirect(id ? `/admin/lessons/${id}/edit` : `/admin/modules/${module.id}/lessons/new`);
     }
-  } else if (pkg) removeUpload('scorm', pkg.filename);
+  } else if (pkg) await removeUpload('scorm', pkg.filename);
   if (installed && !(b.title || '').trim()) b.title = installed.title;
   const data = {
     title: (b.title || 'Untitled lesson').trim(), kind, content: b.content || '', video_url: (b.video_url || '').trim(),
@@ -362,13 +387,13 @@ router.post('/lessons/save', uploadLesson, csrf, async (req, res) => {
       }
     });
   } catch (err) {
-    discard();
+    await discard();
     if (installed) await scorm.remove(installed.folder);
     throw err;
   }
   // Old files go only once the new lesson is safely saved
-  if (attachment || b.remove_attachment) removeUpload('files', existing && existing.attachment);
-  if (video || b.remove_video) removeUpload('videos', existing && existing.video_file);
+  if (attachment || b.remove_attachment) await removeUpload('files', existing && existing.attachment);
+  if (video || b.remove_video) await removeUpload('videos', existing && existing.video_file);
   if (dropPackage) await scorm.remove(existing && existing.scorm_folder);
 
   let note = kind === 'assignment' ? 'Assignment saved.' : 'Lesson saved.';
@@ -399,7 +424,7 @@ router.post('/lessons/:id/delete', async (req, res) => {
   if (!l) return res.redirect('/admin/courses');
   if (!(await teaches(req, l.course_id))) return noAccess(res);
   await db.run('DELETE FROM lessons WHERE id=?', req.params.id);
-  removeUpload('files', l.attachment); removeUpload('videos', l.video_file); await scorm.remove(l.scorm_folder);
+  await removeUpload('files', l.attachment); await removeUpload('videos', l.video_file); await scorm.remove(l.scorm_folder);
   res.redirect(`/admin/courses/${l.course_id}/content`);
 });
 
@@ -589,13 +614,14 @@ function profileFields(body) {
     phone: t('phone'), address: t('address'), postcode: t('postcode').toUpperCase(),
   };
 }
-const removePhoto = file => { if (file) fs.unlink(path.join(__dirname, '..', 'uploads', 'images', file), () => {}); };
+const removePhoto = file => removeUpload('images', file);
 
-router.post('/students', adminOnly, uploadPhoto.single('photo'), csrf, async (req, res) => {
+router.post('/students', adminOnly, async (req, res) => {
   const p = profileFields(req.body), email = (req.body.email || '').trim().toLowerCase();
   const role = ['student', 'tutor', 'admin'].includes(req.body.role) ? req.body.role : 'student';
-  const photo = req.file ? req.file.filename : null;
-  const reject = msg => { removePhoto(photo); flash(req, 'error', msg); res.redirect(listUrl(role)); };
+  const upload = await storage.receive(req.body, 'photo');
+  const photo = upload ? upload.filename : null;
+  const reject = async msg => { await removePhoto(photo); flash(req, 'error', msg); res.redirect(listUrl(role)); };
   if (!p.name || !/^\S+@\S+\.\S+$/.test(email)) return reject('Enter a name and a valid email.');
   if (await db.get('SELECT 1 FROM users WHERE lower(email)=?', email)) return reject('That email already has an account.');
   // Random unknown password: the new user chooses their own from the emailed link
@@ -637,16 +663,17 @@ router.post('/students/:id/role', adminOnly, async (req, res) => {
   flash(req, 'success', 'Role updated.');
   res.redirect(`/admin/students/${req.params.id}`);
 });
-router.post('/students/:id/details', adminOnly, uploadPhoto.single('photo'), csrf, async (req, res, next) => {
+router.post('/students/:id/details', adminOnly, async (req, res, next) => {
+  const upload = await storage.receive(req.body, 'photo');
   const u = await db.get('SELECT * FROM users WHERE id=?', req.params.id);
-  if (!u) { removePhoto(req.file && req.file.filename); return next(); }
+  if (!u) { await removePhoto(upload && upload.filename); return next(); }
   const p = profileFields(req.body);
-  if (!p.name) { removePhoto(req.file && req.file.filename); flash(req, 'error', 'Enter a first and last name.'); return res.redirect(`/admin/students/${u.id}`); }
+  if (!p.name) { await removePhoto(upload && upload.filename); flash(req, 'error', 'Enter a first and last name.'); return res.redirect(`/admin/students/${u.id}`); }
   let photo = u.photo;
-  if (req.file || req.body.remove_photo) photo = req.file ? req.file.filename : null;
+  if (upload || req.body.remove_photo) photo = upload ? upload.filename : null;
   await db.run('UPDATE users SET name=?, first_name=?, last_name=?, phone=?, address=?, postcode=?, photo=? WHERE id=?',
     p.name, p.first_name, p.last_name, p.phone, p.address, p.postcode, photo, u.id);
-  if (photo !== u.photo) removePhoto(u.photo);
+  if (photo !== u.photo) await removePhoto(u.photo);
   flash(req, 'success', 'Details updated.');
   res.redirect(`/admin/students/${u.id}`);
 });
@@ -670,7 +697,7 @@ router.post('/students/:id/enrol', adminOnly, async (req, res) => {
 router.post('/students/:id/delete', adminOnly, async (req, res) => {
   if (Number(req.params.id) === req.user.id) { flash(req, 'error', 'You can’t delete your own account.'); return res.redirect('/admin/students'); }
   const gone = await db.get('DELETE FROM users WHERE id=? RETURNING role, photo', req.params.id);
-  if (gone) removePhoto(gone.photo);
+  if (gone) await removePhoto(gone.photo);
   flash(req, 'success', 'Account deleted.');
   res.redirect(listUrl(gone ? gone.role : 'student'));
 });
@@ -682,31 +709,32 @@ router.get('/policies', async (req, res) => {
   const editing = isAdmin(req) && toId(req.query.edit) ? await db.get('SELECT * FROM policies WHERE id=?', toId(req.query.edit)) : null;
   res.render('admin/policies', { title: 'Policies', policies, editing, section: 'policies' });
 });
-router.post('/policies/save', adminOnly, uploadPolicy.single('file'), csrf, async (req, res) => {
+router.post('/policies/save', adminOnly, async (req, res) => {
   const id = toId(req.body.id);
+  const file = await storage.receive(req.body, 'policy');
   const existing = id ? await db.get('SELECT * FROM policies WHERE id=?', id) : null;
   const title = (req.body.title || '').trim();
   const audience = ['all', 'staff', 'learners'].includes(req.body.audience) ? req.body.audience : 'all';
-  const reject = msg => { removeUpload('policies', req.file && req.file.filename); flash(req, 'error', msg); res.redirect(id ? `/admin/policies?edit=${id}` : '/admin/policies'); };
+  const reject = async msg => { await removeUpload('policies', file && file.filename); flash(req, 'error', msg); res.redirect(id ? `/admin/policies?edit=${id}` : '/admin/policies'); };
   if (id && !existing) return reject('That policy no longer exists.');
   if (!title) return reject('Enter a title for the policy.');
-  if (!req.file && !existing) return reject('Choose the policy file to upload: PDF or Word, up to 20 MB.');
+  if (!file && !existing) return reject('Choose the policy file to upload: PDF or Word, up to 20 MB.');
   if (existing) {
     await db.run('UPDATE policies SET title=?, description=?, audience=?, updated_at=now() WHERE id=?', title, (req.body.description || '').trim(), audience, id);
-    if (req.file) {
-      await db.run('UPDATE policies SET file=?, original_name=? WHERE id=?', req.file.filename, req.file.originalname, id);
-      removeUpload('policies', existing.file);
+    if (file) {
+      await db.run('UPDATE policies SET file=?, original_name=? WHERE id=?', file.filename, file.originalname, id);
+      await removeUpload('policies', existing.file);
     }
   } else {
     await db.run('INSERT INTO policies (title,description,file,original_name,audience) VALUES (?,?,?,?,?)',
-      title, (req.body.description || '').trim(), req.file.filename, req.file.originalname, audience);
+      title, (req.body.description || '').trim(), file.filename, file.originalname, audience);
   }
   flash(req, 'success', existing ? 'Policy updated.' : 'Policy added.');
   res.redirect('/admin/policies');
 });
 router.post('/policies/:id/delete', adminOnly, async (req, res) => {
   const p = await db.get('DELETE FROM policies WHERE id=? RETURNING file', req.params.id);
-  if (p) removeUpload('policies', p.file);
+  if (p) await removeUpload('policies', p.file);
   flash(req, 'success', 'Policy deleted.');
   res.redirect('/admin/policies');
 });
@@ -830,9 +858,9 @@ router.get('/evidence/:id', async (req, res, next) => {
   const s = await db.get('SELECT * FROM submissions WHERE id=?', req.params.id);
   if (!s) return next();
   if (!(await teaches(req, (await submissionCourse(s.id)).course_id))) return noAccess(res);
-  res.download(path.join(__dirname, '..', 'uploads', 'evidence', s.file), s.original_name, err => {
-    if (err && !res.headersSent) res.status(404).render('public/error', { title: 'File not found', message: 'This evidence file is no longer on the server.' });
-  });
+  const url = await storage.signedUrl('evidence', s.file, 60, s.original_name || s.file);
+  if (!url) return res.status(404).render('public/error', { title: 'File not found', message: 'This evidence file is no longer in storage.' });
+  res.redirect(url);
 });
 
 module.exports = router;

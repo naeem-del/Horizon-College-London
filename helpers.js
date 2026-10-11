@@ -48,5 +48,9 @@ module.exports = {
   },
   // Badge colour for a SCORM status
   scormStatusClass(s) { return ['completed', 'passed'].includes(s) ? 'accepted' : s === 'failed' ? 'resubmit' : s === 'incomplete' ? 'pending' : ''; },
+  // Public address of an uploaded image, resource or video (Supabase Storage, "media" bucket)
+  fileUrl(folder, name) {
+    return name ? `${String(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/media/${folder}/${encodeURIComponent(name)}` : '';
+  },
   initials(name) { return String(name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase(); },
 };

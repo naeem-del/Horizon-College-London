@@ -1,6 +1,6 @@
 <a class="course-card" href="/courses/<%= c.slug %>">
   <div class="course-top">
-    <% if (c.image) { %><img src="/uploads/images/<%= c.image %>" alt="" loading="lazy"><% } else { %><span class="arc"></span><% } %>
+    <% if (c.image) { %><img src="<%= fileUrl('images', c.image) %>" alt="" loading="lazy"><% } else { %><span class="arc"></span><% } %>
     <% if (c.level) { %><span class="level-tag"><%= c.level %></span><% } %>
   </div>
   <div class="course-body">

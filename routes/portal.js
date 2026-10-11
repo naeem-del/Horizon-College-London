@@ -1,9 +1,9 @@
 const router = require('express').Router();
 const path = require('path');
-const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
-const { requireLogin, flash, csrf, uploadEvidence } = require('../middleware');
+const { requireLogin, flash } = require('../middleware');
+const storage = require('../storage');
 const learning = require('../learning');
 const scorm = require('../scorm');
 
@@ -125,21 +125,37 @@ router.post('/courses/:slug/lessons/:id/complete', async (req, res, next) => {
   res.redirect(!req.body.undo && nextL && !nextL.locked ? `/portal/courses/${course.slug}/lessons/${nextL.id}` : `/portal/courses/${course.slug}/lessons/${flat[idx].id}`);
 });
 
-// Multer has already saved the file by the time we know the upload isn't allowed, so remove it
-const discardUpload = req => { if (req.file) fs.unlink(req.file.path, () => {}); };
-router.post('/courses/:slug/lessons/:id/submit', uploadEvidence.single('file'), csrf, async (req, res, next) => {
+// The assignment a learner may hand evidence in for: on their course, set for them, and in a module that's open
+async function evidenceTask(req) {
   const { course, allowed } = await loadCourseForLearner(req, req.params.slug);
-  if (!course || !allowed) { discardUpload(req); return next(); }
+  if (!course || !allowed) return {};
   const lesson = (await outline(req, course.id)).flat.find(l => l.id === Number(req.params.id) && l.kind === 'assignment');
-  if (!lesson) { discardUpload(req); return next(); }
-  if (lesson.locked) { discardUpload(req); return refuseLocked(req, res, course, lesson); }
-  if (!req.file) {
+  return { course, lesson };
+}
+
+// Signs a one-time storage link for the evidence file the browser is about to upload (see public/js/direct-upload.js)
+router.post('/courses/:slug/lessons/:id/upload-url', async (req, res) => {
+  const { lesson } = await evidenceTask(req);
+  if (!lesson || lesson.locked || req.body.purpose !== 'evidence') return res.status(403).json({ error: 'You can’t upload evidence for this task.' });
+  const problem = storage.refuse('evidence', req.body.filename, Number(req.body.size));
+  if (problem) return res.status(422).json({ error: problem });
+  res.json(await storage.signUpload('evidence', req.body.filename));
+});
+
+router.post('/courses/:slug/lessons/:id/submit', async (req, res, next) => {
+  const file = await storage.receive(req.body, 'evidence');
+  // The file is already in storage by the time we know the hand-in isn't allowed, so remove it
+  const discard = () => storage.remove('evidence', file && file.filename);
+  const { course, lesson } = await evidenceTask(req);
+  if (!lesson) { await discard(); return next(); }
+  if (lesson.locked) { await discard(); return refuseLocked(req, res, course, lesson); }
+  if (!file) {
     flash(req, 'error', 'Choose a file to upload. Accepted: PDF, Word, Excel, PowerPoint, images, MP4 or ZIP, up to 20 MB.');
     return res.redirect(req.originalUrl.replace(/\/submit$/, ''));
   }
   await db.tx(async t => {
     await t.run('INSERT INTO submissions (user_id,lesson_id,file,original_name,note) VALUES (?,?,?,?,?)',
-      req.user.id, lesson.id, req.file.filename, req.file.originalname, (req.body.note || '').trim());
+      req.user.id, lesson.id, file.filename, file.originalname, (req.body.note || '').trim());
     await t.run('INSERT INTO lesson_progress (user_id,lesson_id) VALUES (?,?) ON CONFLICT DO NOTHING', req.user.id, lesson.id);
   });
   flash(req, 'success', 'Evidence uploaded. Your assessor will review it and leave feedback here.');
@@ -188,9 +204,9 @@ router.post('/scorm/:id/commit', async (req, res) => {
 router.get('/evidence/:id', async (req, res, next) => {
   const s = await db.get('SELECT * FROM submissions WHERE id=?', Number(req.params.id) || 0);
   if (!s || (s.user_id !== req.user.id && req.user.role === 'student')) return next();
-  res.download(path.join(__dirname, '..', 'uploads', 'evidence', s.file), s.original_name, err => {
-    if (err && !res.headersSent) res.status(404).render('public/error', { title: 'File not found', message: 'This evidence file is no longer on the server.' });
-  });
+  const url = await storage.signedUrl('evidence', s.file, 60, s.original_name || s.file);
+  if (!url) return res.status(404).render('public/error', { title: 'File not found', message: 'This evidence file is no longer in storage.' });
+  res.redirect(url);
 });
 
 // ---------- Policies ----------
@@ -203,14 +219,11 @@ router.get('/policies', async (req, res) => {
 router.get('/policies/:id/file', async (req, res, next) => {
   const p = await db.get('SELECT * FROM policies WHERE id=?', Number(req.params.id) || 0);
   if (!p || !policyAudiences(req).includes(p.audience)) return next();
-  const file = path.join(__dirname, '..', 'uploads', 'policies', p.file);
   const name = p.original_name || `${p.title}${path.extname(p.file)}`;
-  const done = err => { if (err && !res.headersSent) res.status(404).render('public/error', { title: 'File not found', message: 'This policy file is no longer on the server.' }); };
-  if (path.extname(p.file) === '.pdf') {
-    res.setHeader('Content-Disposition', `inline; filename="${name.replace(/[^\w.\- ]/g, '_')}"`);
-    return res.sendFile(file, done);
-  }
-  res.download(file, name, done);
+  // A short-lived link: PDFs open in the browser, Word files download under their original name
+  const url = await storage.signedUrl('policies', p.file, 300, path.extname(p.file) === '.pdf' ? undefined : name);
+  if (!url) return res.status(404).render('public/error', { title: 'File not found', message: 'This policy file is no longer in storage.' });
+  res.redirect(url);
 });
 
 router.get('/profile', async (req, res) => {

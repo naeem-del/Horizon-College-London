@@ -2,7 +2,7 @@
 <section class="page-head"><div class="wrap">
   <div class="crumbs"><a href="/awarding-bodies">Awarding bodies</a></div>
   <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
-    <% if (body.logo) { %><img src="/uploads/images/<%= body.logo %>" alt="<%= body.name %> logo" style="height:64px;width:auto;background:#fff;padding:8px;border-radius:10px"><% } %>
+    <% if (body.logo) { %><img src="<%= fileUrl('images', body.logo) %>" alt="<%= body.name %> logo" style="height:64px;width:auto;background:#fff;padding:8px;border-radius:10px"><% } %>
     <h1 style="margin:0"><%= body.name %></h1>
   </div>
   <div style="margin-top:18px"><%- paras(body.description) %></div>

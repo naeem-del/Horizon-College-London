@@ -2,7 +2,7 @@
 <% const isTask = lesson.kind === 'assignment'; %>
 <div class="admin-top"><h1><%= lesson.id ? (isTask ? 'Edit assignment' : 'Edit lesson') : (isTask ? 'Set an assignment' : 'Add lesson') %></h1><a href="/admin/courses/<%= module.course_id %>/content">Back to course content</a></div>
 <p class="muted"><%= course.title %> · Module: <strong><%= module.title %></strong></p>
-<form class="form-card lesson-form" method="post" action="/admin/lessons/save" enctype="multipart/form-data">
+<form class="form-card lesson-form" method="post" action="/admin/lessons/save" enctype="multipart/form-data" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %>
   <input type="hidden" name="id" value="<%= lesson.id || '' %>"><input type="hidden" name="module_id" value="<%= module.id %>">
   <label class="field"><span>Title</span><input type="text" name="title" value="<%= lesson.title || '' %>" required></label>
@@ -57,12 +57,12 @@
   <fieldset>
     <legend>Video <small class="muted" style="font-weight:400">(optional)</small></legend>
     <label class="field"><span>Video link</span><input type="url" name="video_url" value="<%= lesson.video_url || '' %>" placeholder="YouTube or Vimeo link"></label>
-    <label class="field" style="margin-bottom:0"><span>Or upload a video file</span><input type="file" name="video" accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"><small>MP4, WebM or MOV, up to 500 MB. For long videos a YouTube or Vimeo link loads faster for learners.</small>
-      <% if (lesson.video_file) { %><small>Current: <a href="/uploads/videos/<%= lesson.video_file %>" target="_blank"><%= lesson.video_file %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_video"> Remove this video</label><% } %></label>
+    <label class="field" style="margin-bottom:0"><span>Or upload a video file</span><input type="file" data-upload="video" accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"><small>MP4, WebM or MOV, up to <%= uploadMB('video') %> MB. For long videos a YouTube or Vimeo link loads faster for learners.</small>
+      <% if (lesson.video_file) { %><small>Current: <a href="<%= fileUrl('videos', lesson.video_file) %>" target="_blank"><%= lesson.video_file %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_video"> Remove this video</label><% } %></label>
   </fieldset>
 
-  <label class="field"><span>Downloadable resource <small style="display:inline;font-weight:400">(optional)</small></span><input type="file" name="attachment" accept=".pdf,.doc,.docx,.xlsx,.pptx,.zip">
-    <% if (lesson.attachment) { %><small>Current: <a href="/uploads/files/<%= lesson.attachment %>" target="_blank"><%= lesson.attachment %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_attachment"> Remove this file</label><% } %></label>
+  <label class="field"><span>Downloadable resource <small style="display:inline;font-weight:400">(optional)</small></span><input type="file" data-upload="attachment" accept=".pdf,.doc,.docx,.xlsx,.pptx,.zip">
+    <% if (lesson.attachment) { %><small>Current: <a href="<%= fileUrl('files', lesson.attachment) %>" target="_blank"><%= lesson.attachment %></a></small><label class="check" style="margin-top:8px"><input type="checkbox" name="remove_attachment"> Remove this file</label><% } %></label>
   <button class="btn btn-navy"><%= isTask ? 'Save assignment' : 'Save lesson' %></button>
 </form>
 <script>

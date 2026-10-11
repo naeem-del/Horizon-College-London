@@ -11,7 +11,7 @@
 
 <% if (admin) { %>
 <h3 style="margin-top:32px" id="policy-form"><%= editing ? `Edit “${editing.title}”` : 'Add a policy' %></h3>
-<form class="form-card" method="post" action="/admin/policies/save" enctype="multipart/form-data">
+<form class="form-card" method="post" action="/admin/policies/save" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %>
   <input type="hidden" name="id" value="<%= editing ? editing.id : '' %>">
   <div class="two">
@@ -21,7 +21,7 @@
     </select></label>
   </div>
   <label class="field"><span>Short description <small style="display:inline;font-weight:400">(optional)</small></span><input type="text" name="description" value="<%= editing ? editing.description || '' : '' %>" placeholder="One line about what this policy covers"></label>
-  <label class="field"><span><%= editing ? 'Replace the file' : 'Policy file' %></span><input type="file" name="file" accept=".pdf,.doc,.docx" <%= editing ? '' : 'required' %>>
+  <label class="field"><span><%= editing ? 'Replace the file' : 'Policy file' %></span><input type="file" data-upload="policy" accept=".pdf,.doc,.docx" <%= editing ? '' : 'required' %>>
     <small>PDF or Word, up to 20 MB. PDFs open in the browser; Word files download.<% if (editing) { %> Current file: <a href="/portal/policies/<%= editing.id %>/file" target="_blank"><%= editing.original_name %></a>. Leave empty to keep it.<% } %></small></label>
   <div class="row-actions">
     <button class="btn btn-navy"><%= editing ? 'Save changes' : 'Add policy' %></button>

@@ -64,7 +64,7 @@
     <div class="badge-track">
       <% [0, 1].forEach(copy => { set.forEach((b, i) => { const dup = copy > 0 || i >= bodies.length; %>
         <a class="body-badge" href="/awarding-bodies/<%= b.slug %>" title="<%= b.name %>"<% if (dup) { %> aria-hidden="true" tabindex="-1"<% } %>>
-          <% if (b.logo) { %><img src="/uploads/images/<%= b.logo %>" alt="<%= dup ? '' : b.name %>" loading="lazy"><% } else { %><span class="badge-mono"><b><%= initials(b.name) %></b><small><%= b.name %></small></span><% } %>
+          <% if (b.logo) { %><img src="<%= fileUrl('images', b.logo) %>" alt="<%= dup ? '' : b.name %>" loading="lazy"><% } else { %><span class="badge-mono"><b><%= initials(b.name) %></b><small><%= b.name %></small></span><% } %>
         </a>
       <% }) }) %>
     </div>

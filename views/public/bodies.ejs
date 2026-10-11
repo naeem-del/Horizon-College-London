@@ -10,7 +10,7 @@
       <a class="course-card" href="/awarding-bodies/<%= b.slug %>">
         <div class="course-body">
           <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
-            <% if (b.logo) { %><img src="/uploads/images/<%= b.logo %>" alt="" style="height:48px;width:auto"><% } else { %><span class="body-mono" style="width:48px;height:48px;font-size:1rem"><%= initials(b.name) %></span><% } %>
+            <% if (b.logo) { %><img src="<%= fileUrl('images', b.logo) %>" alt="" style="height:48px;width:auto"><% } else { %><span class="body-mono" style="width:48px;height:48px;font-size:1rem"><%= initials(b.name) %></span><% } %>
             <h3 style="margin:0"><%= b.name %></h3>
           </div>
           <p><%= (b.description || '').slice(0, 180) %><%= (b.description || '').length > 180 ? '…' : '' %></p>

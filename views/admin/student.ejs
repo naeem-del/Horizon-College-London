@@ -4,7 +4,7 @@
   <div class="panel">
     <h3>Details</h3>
     <div class="profile-top">
-      <% if (student.photo) { %><img class="passport" src="/uploads/images/<%= student.photo %>" alt="Photo of <%= student.name %>" width="120" height="150"><% } else { %><span class="passport passport-empty" aria-hidden="true"><%= initials(student.name) %></span><% } %>
+      <% if (student.photo) { %><img class="passport" src="<%= fileUrl('images', student.photo) %>" alt="Photo of <%= student.name %>" width="120" height="150"><% } else { %><span class="passport passport-empty" aria-hidden="true"><%= initials(student.name) %></span><% } %>
     <dl class="facts">
       <dt>Email</dt><dd><%= student.email %></dd>
       <dt>Phone</dt><dd><%= student.phone || '—' %></dd>
@@ -17,7 +17,7 @@
     <% if (user.role === 'admin') { %>
       <details class="edit-details">
         <summary class="btn btn-line btn-sm">Edit details</summary>
-        <form method="post" action="/admin/students/<%= student.id %>/details" enctype="multipart/form-data" style="margin-top:16px"><%- include('../partials/csrf') %>
+        <form method="post" action="/admin/students/<%= student.id %>/details" data-direct-upload="/admin/uploads/sign" style="margin-top:16px"><%- include('../partials/csrf') %>
           <% const parts = student.first_name || student.last_name ? [student.first_name, student.last_name] : [student.name.split(' ')[0], student.name.split(' ').slice(1).join(' ')]; %>
           <div class="two">
             <label class="field"><span>First name</span><input type="text" name="first_name" value="<%= parts[0] || '' %>" required></label>
@@ -26,7 +26,7 @@
           <label class="field"><span>Phone number</span><input type="tel" name="phone" value="<%= student.phone || '' %>"></label>
           <label class="field"><span>Address</span><textarea name="address" rows="2"><%= student.address || '' %></textarea></label>
           <label class="field"><span>Postcode</span><input type="text" name="postcode" value="<%= student.postcode || '' %>" style="text-transform:uppercase"></label>
-          <label class="field"><span><%= student.photo ? 'Replace profile picture' : 'Profile picture' %></span><input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"></label>
+          <label class="field"><span><%= student.photo ? 'Replace profile picture' : 'Profile picture' %></span><input type="file" data-upload="photo" accept=".jpg,.jpeg,.png,.webp"></label>
           <% if (student.photo) { %><label class="small" style="display:block;margin:-8px 0 16px"><input type="checkbox" name="remove_photo" value="1"> Remove current picture</label><% } %>
           <button class="btn btn-navy btn-sm">Save details</button>
         </form>

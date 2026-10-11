@@ -16,7 +16,7 @@
 <% if (user.role === 'admin') { %>
 <h3 style="margin-top:32px"><%= staff ? 'Add a staff member' : 'Add a learner' %></h3>
 <% if (staff) { %>
-<form class="form-card" method="post" action="/admin/students" enctype="multipart/form-data">
+<form class="form-card" method="post" action="/admin/students" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %>
   <div class="two">
     <label class="field"><span>First name</span><input type="text" name="first_name" autocomplete="off" required></label>
@@ -29,7 +29,7 @@
     <label class="field"><span>Postcode</span><input type="text" name="postcode" autocomplete="off" style="text-transform:uppercase"></label>
     <label class="field"><span>Role</span><select name="role"><option value="tutor">Tutor / assessor</option><option value="admin">Admin</option></select></label>
   </div>
-  <label class="field"><span>Profile picture</span><input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp"><small>JPG, PNG or WebP. A square photo works best.</small></label>
+  <label class="field"><span>Profile picture</span><input type="file" data-upload="photo" accept=".jpg,.jpeg,.png,.webp"><small>JPG, PNG or WebP. A square photo works best.</small></label>
   <button class="btn btn-navy">Create account and email invitation</button>
 </form>
 <% } else { %>

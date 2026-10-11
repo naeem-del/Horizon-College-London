@@ -1,1 +1,1 @@
-<% if (who.photo) { %><img class="avatar" src="/uploads/images/<%= who.photo %>" alt="" width="34" height="34"><% } else { %><span class="avatar" aria-hidden="true"><%= initials(who.name) %></span><% } %>
+<% if (who.photo) { %><img class="avatar" src="<%= fileUrl('images', who.photo) %>" alt="" width="34" height="34"><% } else { %><span class="avatar" aria-hidden="true"><%= initials(who.name) %></span><% } %>
