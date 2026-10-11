@@ -91,8 +91,7 @@ router.post('/bodies/:id/delete', adminOnly, (req, res) => {
 router.get('/courses', (req, res) => {
   const courses = db.prepare(`SELECT c.*, ab.name body_name,
       (SELECT COUNT(*) FROM enrolments e WHERE e.course_id=c.id AND e.status IN ('active','pending')) learners,
-      (SELECT COUNT(*) FROM lessons l JOIN modules m ON m.id=l.module_id WHERE m.course_id=c.id) lessons,
-      (SELECT GROUP_CONCAT(u.name, ', ') FROM course_staff cs JOIN users u ON u.id=cs.user_id WHERE cs.course_id=c.id) staff
+      (SELECT COUNT(*) FROM lessons l JOIN modules m ON m.id=l.module_id WHERE m.course_id=c.id) lessons,      (SELECT GROUP_CONCAT(u.name, ', ') FROM course_staff cs JOIN users u ON u.id=cs.user_id WHERE cs.course_id=c.id) staff
     FROM courses c LEFT JOIN awarding_bodies ab ON ab.id=c.awarding_body_id WHERE ${myCourses(req)} ORDER BY c.title`).all();
   res.render('admin/courses', { title: isAdmin(req) ? 'Courses' : 'My courses', courses });
 });
@@ -129,16 +128,16 @@ router.post('/courses/save', adminOnly, uploadCourse, csrf, (req, res) => {
     awarding_body_id: Number(b.awarding_body_id) || null, level: b.level || '', qualification_type: b.qualification_type || '',
     framework: b.framework || '', duration: b.duration || '', study_mode: b.study_mode || '', price: Number(b.price) || 0,
     summary: b.summary || '', description: b.description || '', entry_requirements: b.entry_requirements || '', assessment: b.assessment || '',
-    published: b.published ? 1 : 0, featured: b.featured ? 1 : 0,
+    published: b.published ? 1 : 0, featured: b.featured ? 1 : 0, sequential: b.sequential ? 1 : 0,
   };
   let courseId = id;
   if (id) {
     db.prepare(`UPDATE courses SET title=@title, slug=@slug, awarding_body_id=@awarding_body_id, level=@level, qualification_type=@qualification_type,
       framework=@framework, duration=@duration, study_mode=@study_mode, price=@price, summary=@summary, description=@description,
-      entry_requirements=@entry_requirements, assessment=@assessment, published=@published, featured=@featured WHERE id=@id`).run({ ...data, id });
+      entry_requirements=@entry_requirements, assessment=@assessment, published=@published, featured=@featured, sequential=@sequential WHERE id=@id`).run({ ...data, id });
   } else {
-    courseId = db.prepare(`INSERT INTO courses (title,slug,awarding_body_id,level,qualification_type,framework,duration,study_mode,price,summary,description,entry_requirements,assessment,published,featured)
-      VALUES (@title,@slug,@awarding_body_id,@level,@qualification_type,@framework,@duration,@study_mode,@price,@summary,@description,@entry_requirements,@assessment,@published,@featured)`).run(data).lastInsertRowid;
+    courseId = db.prepare(`INSERT INTO courses (title,slug,awarding_body_id,level,qualification_type,framework,duration,study_mode,price,summary,description,entry_requirements,assessment,published,featured,sequential)
+      VALUES (@title,@slug,@awarding_body_id,@level,@qualification_type,@framework,@duration,@study_mode,@price,@summary,@description,@entry_requirements,@assessment,@published,@featured,@sequential)`).run(data).lastInsertRowid;
   }
   if (image) db.prepare('UPDATE courses SET image=? WHERE id=?').run(image.filename, courseId);
   if (installed) {
@@ -173,7 +172,8 @@ router.get('/courses/:id/content', (req, res, next) => {
   if (!course) return next();
   if (!teaches(req, course.id)) return noAccess(res);
   const modules = db.prepare('SELECT * FROM modules WHERE course_id=? ORDER BY position, id').all(course.id);
-  const lessons = db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM assignment_learners al WHERE al.lesson_id=l.id) picked
+  const lessons = db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM assignment_learners al WHERE al.lesson_id=l.id) picked,
+      (SELECT GROUP_CONCAT(b.name, ', ') FROM assignment_batches ab JOIN batches b ON b.id=ab.batch_id WHERE ab.lesson_id=l.id) batch_names
     FROM lessons l JOIN modules m ON m.id=l.module_id WHERE m.course_id=? ORDER BY l.position, l.id`).all(course.id);
   for (const m of modules) m.lessons = lessons.filter(l => l.module_id === m.id);
   const staff = db.prepare('SELECT u.id, u.name, u.role, u.photo FROM course_staff cs JOIN users u ON u.id=cs.user_id WHERE cs.course_id=? ORDER BY u.name').all(course.id);
@@ -230,7 +230,7 @@ router.post('/modules/:id', (req, res) => {
   res.redirect(`/admin/courses/${m.course_id}/content`);
 });
 // Learners who can be set an assignment: everyone enrolled on the course and not cancelled
-const courseLearners = courseId => db.prepare(`SELECT u.id, u.name, u.email, e.status FROM enrolments e JOIN users u ON u.id=e.user_id
+const courseLearners = courseId => db.prepare(`SELECT u.id, u.name, u.email, e.status, e.batch_id FROM enrolments e JOIN users u ON u.id=e.user_id
   WHERE e.course_id=? AND e.status<>'cancelled' ORDER BY u.name`).all(courseId);
 const lessonCourse = lessonId => db.prepare('SELECT m.course_id FROM lessons l JOIN modules m ON m.id=l.module_id WHERE l.id=?').get(lessonId);
 const removeUpload = (folder, file) => { if (file) fs.unlink(path.join(__dirname, '..', 'uploads', folder, path.basename(file)), () => {}); };
@@ -239,8 +239,11 @@ const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
 function renderLessonForm(res, module, lesson) {
   const course = db.prepare('SELECT id, title, slug FROM courses WHERE id=?').get(module.course_id);
   const picked = {};
+  const pickedBatches = {};
   if (lesson.id) for (const a of db.prepare('SELECT user_id, due_date FROM assignment_learners WHERE lesson_id=?').all(lesson.id)) picked[a.user_id] = a.due_date || '';
-  res.render('admin/lesson-form', { title: lesson.id ? 'Edit lesson' : 'Add lesson', module, lesson, course, learners: courseLearners(module.course_id), picked, section: 'courses' });
+  if (lesson.id) for (const a of db.prepare('SELECT batch_id, due_date FROM assignment_batches WHERE lesson_id=?').all(lesson.id)) pickedBatches[a.batch_id] = a.due_date || '';
+  res.render('admin/lesson-form', { title: lesson.id ? 'Edit lesson' : 'Add lesson', module, lesson, course, learners: courseLearners(module.course_id), picked,
+    batches: batchList(module.course_id), pickedBatches, section: 'courses' });
 }
 router.get('/modules/:id/lessons/new', (req, res, next) => {
   const module = db.prepare('SELECT * FROM modules WHERE id=?').get(req.params.id);
@@ -281,7 +284,7 @@ router.post('/lessons/save', uploadLesson, csrf, async (req, res) => {
   const data = {
     title: (b.title || 'Untitled lesson').trim(), kind, content: b.content || '', video_url: (b.video_url || '').trim(),
     due_date: kind === 'assignment' && isDate(b.due_date) ? b.due_date : null,
-    assign_to: kind === 'assignment' && b.assign_to === 'selected' ? 'selected' : 'all',
+    assign_to: kind === 'assignment' && ['selected', 'batches'].includes(b.assign_to) ? b.assign_to : 'all',
     total_marks: kind === 'assignment' && Number(b.total_marks) > 0 ? Math.min(Number(b.total_marks), 10000) : null,
   };
   let lessonId = id;
@@ -311,16 +314,29 @@ router.post('/lessons/save', uploadLesson, csrf, async (req, res) => {
       db.prepare('INSERT INTO assignment_learners (lesson_id,user_id,due_date) VALUES (?,?,?)').run(lessonId, l.id, isDate(own) ? own : null);
     }
   }
+  // Or which batches, each with an optional batch deadline
+  db.prepare('DELETE FROM assignment_batches WHERE lesson_id=?').run(lessonId);
+  const batchDue = {};
+  if (kind === 'assignment' && data.assign_to === 'batches') {
+    const chosen = new Set([].concat(b.batches || []).map(Number));
+    for (const bt of batchList(module.course_id).filter(bt => chosen.has(bt.id))) {
+      const own = b[`bdue_${bt.id}`];
+      batchDue[bt.id] = isDate(own) ? own : null;
+      db.prepare('INSERT INTO assignment_batches (lesson_id,batch_id,due_date) VALUES (?,?,?)').run(lessonId, bt.id, batchDue[bt.id]);
+    }
+  }
 
   let note = kind === 'assignment' ? 'Assignment saved.' : 'Lesson saved.';
+  if (data.assign_to === 'batches' && !Object.keys(batchDue).length) note += ' No batch is ticked, so no learner can see it yet.';
   if (installed && installed.count > 1) note += ` This package has ${installed.count} activities; this lesson plays the first one. To get every unit and activity as its own lesson, create a course from the package instead (Courses → Add course → Upload a SCORM package).`;
   if (kind === 'assignment' && b.notify) {
     const course = db.prepare('SELECT title, slug FROM courses WHERE id=?').get(module.course_id);
     const own = Object.fromEntries(db.prepare('SELECT user_id, due_date FROM assignment_learners WHERE lesson_id=?').all(lessonId).map(a => [a.user_id, a.due_date]));
-    const targets = enrolled.filter(l => l.status === 'active' && (data.assign_to === 'all' || l.id in own));
+    const setFor = l => (data.assign_to === 'all' ? true : data.assign_to === 'batches' ? l.batch_id in batchDue : l.id in own);
+    const targets = enrolled.filter(l => l.status === 'active' && setFor(l));
     const link = `${links.baseUrl(req)}/portal/courses/${course.slug}/lessons/${lessonId}`;
     const results = await Promise.all(targets.map(l => {
-      const due = own[l.id] || data.due_date;
+      const due = own[l.id] || batchDue[l.batch_id] || data.due_date;
       return sendMail({
         to: l.email, subject: `New assignment: ${data.title}`,
         text: `Hello ${l.name},\n\nA new assignment has been set for you on ${course.title}: ${data.title}.\n\n`
@@ -340,6 +356,140 @@ router.post('/lessons/:id/delete', (req, res) => {
   db.prepare('DELETE FROM lessons WHERE id=?').run(req.params.id);
   removeUpload('files', l.attachment); removeUpload('videos', l.video_file); scorm.remove(l.scorm_folder);
   res.redirect(`/admin/courses/${l.course_id}/content`);
+});
+
+// ---------- Batches ----------
+// A course's learners are split into batches. Joining a batch issues a learner number: the batch code plus the
+// learner's place in it ("L4NDBA-B1-007"). Batch codes are unique, so learner numbers are unique across the college.
+const loadBatch = id => db.prepare('SELECT * FROM batches WHERE id=?').get(id);
+const batchList = courseId => db.prepare(`SELECT b.*, (SELECT COUNT(*) FROM enrolments e WHERE e.batch_id=b.id AND e.status<>'cancelled') size
+  FROM batches b WHERE b.course_id=? ORDER BY COALESCE(b.start_date, b.created_at), b.id`).all(courseId);
+const batchCode = s => String(s || '').trim().toUpperCase().replace(/\s+/g, '-');
+// Suggested code for a course's next batch: initials of the title's main words, then B1, B2…
+function suggestCode(course) {
+  const minor = new Set(['in', 'and', 'of', 'the', 'for', 'to', 'a', 'an', 'with', 'on']);
+  const prefix = course.title.split(/[^A-Za-z0-9]+/).filter(w => w && !minor.has(w.toLowerCase())).map(w => w[0]).join('').toUpperCase().slice(0, 8) || `C${course.id}`;
+  for (let n = db.prepare('SELECT COUNT(*) n FROM batches WHERE course_id=?').get(course.id).n + 1; ; n++) {
+    if (!db.prepare('SELECT 1 FROM batches WHERE code=?').get(`${prefix}-B${n}`)) return `${prefix}-B${n}`;
+  }
+}
+function batchFields(b) {
+  const name = String(b.name || '').trim(), code = batchCode(b.code), cap = String(b.capacity || '').trim();
+  const capacity = cap === '' ? null : Number(cap);
+  const start_date = isDate(b.start_date) ? b.start_date : null, end_date = isDate(b.end_date) ? b.end_date : null;
+  if (!name) return { error: 'Enter a name for the batch.' };
+  if (code && !/^[A-Z0-9][A-Z0-9-]{0,23}$/.test(code)) return { error: 'Batch codes can only use letters, numbers and dashes (up to 24 characters).' };
+  if (capacity !== null && !(Number.isInteger(capacity) && capacity > 0)) return { error: 'Capacity must be a whole number above 0, or blank for no limit.' };
+  if (start_date && end_date && end_date < start_date) return { error: 'The end date is before the start date.' };
+  return { name, code, capacity, start_date, end_date };
+}
+// Moves an enrolment into a batch (or out of every batch when batch is null) and issues its learner number.
+// Numbers are never reused: moving batch, or leaving and rejoining, gives a new one. Returns the new number
+// ('' when removed from a batch), or false when the batch is full.
+function placeInBatch(enrolment, batch) {
+  if (!batch) {
+    db.prepare('UPDATE enrolments SET batch_id=NULL, learner_number=NULL WHERE id=?').run(enrolment.id);
+    return '';
+  }
+  if (enrolment.batch_id === batch.id) return enrolment.learner_number;
+  const size = db.prepare("SELECT COUNT(*) n FROM enrolments WHERE batch_id=? AND status<>'cancelled'").get(batch.id).n;
+  if (batch.capacity && size >= batch.capacity) return false;
+  const n = db.prepare('SELECT next_number FROM batches WHERE id=?').get(batch.id).next_number;
+  const number = `${batch.code}-${String(n).padStart(3, '0')}`;
+  db.prepare('UPDATE batches SET next_number=? WHERE id=?').run(n + 1, batch.id);
+  db.prepare('UPDATE enrolments SET batch_id=?, learner_number=? WHERE id=?').run(batch.id, number, enrolment.id);
+  return number;
+}
+
+router.get('/courses/:id/batches', (req, res, next) => {
+  const course = db.prepare('SELECT id, title, slug FROM courses WHERE id=?').get(req.params.id);
+  if (!course) return next();
+  if (!teaches(req, course.id)) return noAccess(res);
+  const batches = batchList(course.id);
+  // Cancelled enrolments only appear while they still hold a place in a batch
+  const learners = db.prepare(`SELECT e.id, e.status, e.batch_id, e.learner_number, u.id user_id, u.name, u.email FROM enrolments e JOIN users u ON u.id=e.user_id
+    WHERE e.course_id=? AND (e.status<>'cancelled' OR e.batch_id IS NOT NULL) ORDER BY e.learner_number, u.name`).all(course.id);
+  // Each learner's progress counts only what they can see, so batch-only assignments don't hold other batches back
+  for (const l of learners) l.progress = learning.progress(l.user_id, course.id);
+  const average = list => (list.length ? Math.round(list.reduce((n, l) => n + l.progress.pct, 0) / list.length) : null);
+  for (const b of batches) { b.learners = learners.filter(l => l.batch_id === b.id); b.avg = average(b.learners.filter(l => l.status !== 'cancelled')); }
+  const unbatched = learners.filter(l => !l.batch_id);
+  res.render('admin/batches', { title: `Learners: ${course.title}`, course, batches, unbatched, suggested: suggestCode(course),
+    courseAvg: average(learners.filter(l => l.status !== 'cancelled')), section: 'courses' });
+});
+router.post('/courses/:id/batches', (req, res, next) => {
+  const course = db.prepare('SELECT id, title FROM courses WHERE id=?').get(req.params.id);
+  if (!course) return next();
+  if (!teaches(req, course.id)) return noAccess(res);
+  const url = `/admin/courses/${course.id}/batches`;
+  const f = batchFields(req.body);
+  if (f.error) { flash(req, 'error', f.error); return res.redirect(url); }
+  const code = f.code || suggestCode(course);
+  if (db.prepare('SELECT 1 FROM batches WHERE code=?').get(code)) { flash(req, 'error', `The code ${code} is already used by another batch. Choose a different one.`); return res.redirect(url); }
+  db.prepare('INSERT INTO batches (course_id,name,code,capacity,start_date,end_date) VALUES (?,?,?,?,?,?)').run(course.id, f.name, code, f.capacity, f.start_date, f.end_date);
+  flash(req, 'success', `${f.name} added. Tick learners below and move them into it to give them learner numbers.`);
+  res.redirect(url);
+});
+router.post('/batches/:id', (req, res, next) => {
+  const batch = loadBatch(req.params.id);
+  if (!batch) return next();
+  if (!teaches(req, batch.course_id)) return noAccess(res);
+  const url = `/admin/courses/${batch.course_id}/batches`;
+  const size = db.prepare('SELECT COUNT(*) n FROM enrolments WHERE batch_id=?').get(batch.id).n;
+  if (req.body.delete) {
+    if (size) { flash(req, 'error', 'Move this batch’s learners to another batch (or out of batches) before deleting it.'); return res.redirect(url); }
+    db.prepare('DELETE FROM batches WHERE id=?').run(batch.id);
+    flash(req, 'success', `${batch.name} deleted.`);
+    return res.redirect(url);
+  }
+  const f = batchFields(req.body);
+  if (f.error) { flash(req, 'error', f.error); return res.redirect(url); }
+  // The code is part of every learner number already issued, so it's fixed once the first one is given out
+  const code = batch.next_number > 1 ? batch.code : f.code || batch.code;
+  if (code !== batch.code && db.prepare('SELECT 1 FROM batches WHERE code=?').get(code)) { flash(req, 'error', `The code ${code} is already used by another batch.`); return res.redirect(url); }
+  const active = db.prepare("SELECT COUNT(*) n FROM enrolments WHERE batch_id=? AND status<>'cancelled'").get(batch.id).n;
+  if (f.capacity && f.capacity < active) { flash(req, 'error', `This batch already has ${active} learners, so its capacity can’t be less than ${active}.`); return res.redirect(url); }
+  db.prepare('UPDATE batches SET name=?, code=?, capacity=?, start_date=?, end_date=? WHERE id=?').run(f.name, code, f.capacity, f.start_date, f.end_date, batch.id);
+  flash(req, 'success', `${f.name} saved.`);
+  res.redirect(url);
+});
+// Moves the ticked learners into a batch, or out of batches when no batch is chosen
+router.post('/courses/:id/batches/assign', (req, res, next) => {
+  const course = db.prepare('SELECT id FROM courses WHERE id=?').get(req.params.id);
+  if (!course) return next();
+  if (!teaches(req, course.id)) return noAccess(res);
+  const url = `/admin/courses/${course.id}/batches`;
+  const target = req.body.batch_id ? loadBatch(req.body.batch_id) : null;
+  if (req.body.batch_id && (!target || target.course_id !== course.id)) { flash(req, 'error', 'That batch no longer exists.'); return res.redirect(url); }
+  const ids = [].concat(req.body.enrolments || []).map(Number).filter(Number.isInteger);
+  if (!ids.length) { flash(req, 'error', 'Tick the learners you want to move first.'); return res.redirect(url); }
+  // Alphabetical, so learners joining together get numbers in name order
+  const rows = db.prepare(`SELECT e.* FROM enrolments e JOIN users u ON u.id=e.user_id
+    WHERE e.course_id=? AND e.id IN (${ids.map(() => '?').join(',')}) ORDER BY u.name`).all(course.id, ...ids);
+  let moved = 0, full = 0;
+  for (const e of rows) {
+    if ((target ? target.id : null) === e.batch_id) continue;
+    if (placeInBatch(e, target) === false) full++; else moved++;
+  }
+  const s = n => (n === 1 ? '' : 's');
+  let msg = target ? `${moved} learner${s(moved)} moved to ${target.name} and given learner numbers.` : `${moved} learner${s(moved)} taken out of their batch. Their learner numbers have been withdrawn.`;
+  if (full) msg += ` ${full} couldn’t be added because ${target.name} is full (capacity ${target.capacity}).`;
+  flash(req, full && !moved ? 'error' : 'success', msg);
+  res.redirect(url);
+});
+// Single learner, from their page
+router.post('/enrolments/:id/batch', (req, res, next) => {
+  const e = db.prepare('SELECT * FROM enrolments WHERE id=?').get(req.params.id);
+  if (!e) return next();
+  if (!teaches(req, e.course_id)) return noAccess(res);
+  const target = req.body.batch_id ? loadBatch(req.body.batch_id) : null;
+  if (req.body.batch_id && (!target || target.course_id !== e.course_id)) { flash(req, 'error', 'That batch no longer exists.'); return res.redirect(back(req, '/admin/students')); }
+  if ((target ? target.id : null) !== e.batch_id) {
+    const number = placeInBatch(e, target);
+    if (number === false) flash(req, 'error', `${target.name} is full (capacity ${target.capacity}). Raise its capacity or choose another batch.`);
+    else flash(req, 'success', target ? `Moved to ${target.name}. Learner number: ${number}.` : 'Taken out of the batch. Their learner number has been withdrawn.');
+  }
+  res.redirect(back(req, `/admin/students/${e.user_id}`));
 });
 
 // ---------- Learners & staff ----------
@@ -387,8 +537,12 @@ router.post('/students', adminOnly, uploadPhoto.single('photo'), csrf, async (re
 router.get('/students/:id', (req, res, next) => {
   const student = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!student) return next();
-  const enrolments = db.prepare(`SELECT e.*, c.title, c.slug FROM enrolments e JOIN courses c ON c.id=e.course_id WHERE e.user_id=? ORDER BY e.created_at DESC`).all(student.id);
-  for (const e of enrolments) e.pct = learning.progress(student.id, e.course_id).pct;
+  const enrolments = db.prepare(`SELECT e.*, c.title, c.slug, b.name batch_name FROM enrolments e JOIN courses c ON c.id=e.course_id
+    LEFT JOIN batches b ON b.id=e.batch_id WHERE e.user_id=? ORDER BY e.created_at DESC`).all(student.id);
+  for (const e of enrolments) {
+    e.progress = learning.progress(student.id, e.course_id);
+    e.batches = teaches(req, e.course_id) ? batchList(e.course_id) : null; // only staff on the course can change the batch
+  }
   const submissions = db.prepare(`SELECT s.*, l.title lesson_title, l.total_marks FROM submissions s JOIN lessons l ON l.id=s.lesson_id WHERE s.user_id=? ORDER BY s.id DESC`).all(student.id);
   const scormResults = db.prepare(`SELECT a.*, l.title lesson_title, c.title course_title FROM scorm_attempts a JOIN lessons l ON l.id=a.lesson_id
     JOIN modules m ON m.id=l.module_id JOIN courses c ON c.id=m.course_id WHERE a.user_id=? ORDER BY a.updated_at DESC`).all(student.id);
@@ -494,8 +648,8 @@ router.post('/account', (req, res) => {
 // ---------- Enrolments ----------
 router.get('/enrolments', adminOnly, (req, res) => {
   const status = ['pending', 'active', 'completed', 'cancelled'].includes(req.query.status) ? req.query.status : 'pending';
-  const rows = db.prepare(`SELECT e.*, u.name, u.email, c.title FROM enrolments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id
-    WHERE e.status=? ORDER BY e.created_at DESC`).all(status);
+  const rows = db.prepare(`SELECT e.*, u.name, u.email, c.title, b.name batch_name FROM enrolments e JOIN users u ON u.id=e.user_id JOIN courses c ON c.id=e.course_id
+    LEFT JOIN batches b ON b.id=e.batch_id WHERE e.status=? ORDER BY e.created_at DESC`).all(status);
   res.render('admin/enrolments', { title: 'Enrolments', rows, status });
 });
 router.post('/enrolments/:id', adminOnly, (req, res) => {
@@ -538,9 +692,10 @@ router.post('/enquiries/:id', adminOnly, (req, res) => {
 router.get('/submissions', (req, res) => {
   const show = req.query.show === 'all' ? 'all' : 'open';
   const rows = db.prepare(`SELECT s.*, u.name student, u.id student_id, l.title lesson_title, l.total_marks, c.title course_title, mk.name marker,
-      COALESCE(NULLIF(al.due_date,''), NULLIF(l.due_date,'')) due
+      COALESCE(NULLIF(al.due_date,''), NULLIF(ab.due_date,''), NULLIF(l.due_date,'')) due
     FROM submissions s JOIN users u ON u.id=s.user_id JOIN lessons l ON l.id=s.lesson_id JOIN modules m ON m.id=l.module_id JOIN courses c ON c.id=m.course_id
     LEFT JOIN assignment_learners al ON al.lesson_id=l.id AND al.user_id=s.user_id LEFT JOIN users mk ON mk.id=s.marked_by
+    LEFT JOIN enrolments en ON en.user_id=s.user_id AND en.course_id=c.id LEFT JOIN assignment_batches ab ON ab.lesson_id=l.id AND ab.batch_id=en.batch_id
     WHERE (@show='all' OR s.reviewed_at IS NULL) AND ${myCourses(req)} ORDER BY s.id DESC LIMIT 200`).all({ show });
   res.render('admin/submissions', { title: 'Evidence review', rows, show });
 });

@@ -114,6 +114,24 @@ CREATE TABLE IF NOT EXISTS scorm_attempts (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, lesson_id)
 );
+-- Groups of learners on the same course (e.g. a 40-learner intake split into two). The code prefixes every learner
+-- number issued in the batch; next_number only ever goes up, so a number is never given out twice.
+CREATE TABLE IF NOT EXISTS batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
+  capacity INTEGER, start_date TEXT, end_date TEXT,
+  next_number INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+-- Batches an assignment is set for (lessons.assign_to = 'batches'), each with an optional deadline of its own.
+-- Follows batch membership, so a learner who joins the batch later sees the assignment too.
+CREATE TABLE IF NOT EXISTS assignment_batches (
+  lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+  due_date TEXT,
+  PRIMARY KEY (lesson_id, batch_id)
+);
 CREATE TABLE IF NOT EXISTS password_tokens (
   token_hash TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -140,6 +158,14 @@ const subCols = raw.prepare('PRAGMA table_info(submissions)').all().map(c => c.n
 if (!subCols.includes('mark')) db.exec('ALTER TABLE submissions ADD COLUMN mark REAL');
 if (!subCols.includes('marked_by')) db.exec('ALTER TABLE submissions ADD COLUMN marked_by INTEGER REFERENCES users(id) ON DELETE SET NULL');
 if (!subCols.includes('marked_at')) db.exec('ALTER TABLE submissions ADD COLUMN marked_at TEXT');
+// Modules open one after another: a learner must finish a module before the next one opens
+const courseCols = raw.prepare('PRAGMA table_info(courses)').all().map(c => c.name);
+if (!courseCols.includes('sequential')) db.exec('ALTER TABLE courses ADD COLUMN sequential INTEGER NOT NULL DEFAULT 1');
+// The batch a learner is in on a course, and the learner number they were given when they joined it
+const enrolCols = raw.prepare('PRAGMA table_info(enrolments)').all().map(c => c.name);
+if (!enrolCols.includes('batch_id')) db.exec('ALTER TABLE enrolments ADD COLUMN batch_id INTEGER REFERENCES batches(id) ON DELETE SET NULL');
+if (!enrolCols.includes('learner_number')) db.exec('ALTER TABLE enrolments ADD COLUMN learner_number TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS enrolments_learner_number ON enrolments(learner_number)');
 
 // ---------- Seed (runs once, on an empty database) ----------
 function slugify(s) {

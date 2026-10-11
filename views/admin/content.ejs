@@ -2,6 +2,7 @@
 <div class="admin-top">
   <div><a href="/admin/courses" class="small"><%= user.role === 'admin' ? 'Courses' : 'My courses' %></a><h1><%= course.title %></h1></div>
   <div class="row-actions">
+    <a class="btn btn-line btn-sm" href="/admin/courses/<%= course.id %>/batches">Learners &amp; batches</a>
     <% if (user.role === 'admin') { %><a class="btn btn-line btn-sm" href="/admin/courses/<%= course.id %>/edit">Course details</a><% } %>
     <a class="btn btn-line btn-sm" href="/portal/courses/<%= course.slug %>" target="_blank">Preview as learner</a>
   </div>
@@ -45,7 +46,7 @@
           <% if (l.video_file || l.video_url) { %><span class="small muted"> · video</span><% } %>
           <% if (l.scorm_folder) { %><span class="kind scorm" style="margin:0 0 0 8px">SCORM <%= l.scorm_version %></span><% } %>
           <% if (l.kind === 'assignment') { %>
-            <span class="small muted"> · <%= l.assign_to === 'selected' ? `${l.picked} selected learner${l.picked === 1 ? '' : 's'}` : 'all learners' %><%= l.due_date ? ` · due ${dueDate(l.due_date)}` : '' %><%= l.total_marks ? ` · out of ${markText(l.total_marks)}` : '' %></span>
+            <span class="small muted"> · <%= l.assign_to === 'selected' ? `${l.picked} selected learner${l.picked === 1 ? '' : 's'}` : l.assign_to === 'batches' ? (l.batch_names || 'no batch ticked') : 'all learners' %><%= l.due_date ? ` · due ${dueDate(l.due_date)}` : '' %><%= l.total_marks ? ` · out of ${markText(l.total_marks)}` : '' %></span>
           <% } %>
         </span>
         <span class="row-actions">

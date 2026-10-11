@@ -342,3 +342,12 @@ textarea { min-height: 130px; resize: vertical; }
 .auth-form { display: grid; place-items: center; padding: 48px 24px; }
 .auth-form form { width: 100%; max-width: 400px; }
 @media (max-width: 860px) { .auth { grid-template-columns: 1fr; } .auth-art { display: none; } }
+
+/* Learner number, shown to staff and to the learner */
+.ln { display: inline-block; font: 600 .82rem/1.4 ui-monospace, Consolas, monospace; letter-spacing: .02em; color: var(--navy); background: #E7ECF7; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+
+/* Modules that open once the one before is finished */
+.locked-note { margin: 0 10px 4px; font-size: .8rem; color: var(--slate); }
+.locked-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; color: var(--slate); font-size: .93rem; line-height: 1.35; opacity: .7; cursor: not-allowed; }
+.tick.lock { border: 0; border-radius: 0; background: no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27none%27 stroke=%27%236B7488%27 stroke-width=%271.8%27%3E%3Crect x=%273%27 y=%277%27 width=%2710%27 height=%278%27 rx=%271.5%27/%3E%3Cpath d=%27M5.5 7V5a2.5 2.5 0 0 1 5 0v2%27/%3E%3C/svg%3E"); }
+.locked-next { align-self: center; max-width: 340px; }

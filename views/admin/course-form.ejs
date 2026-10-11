@@ -41,6 +41,7 @@
   <p class="small muted scorm-only">You can add the website details (level, awarding body, description, cover image) afterwards with Edit.</p>
   <label class="check"><input type="checkbox" name="published" <%= course.published ? 'checked' : '' %>> Published on the website</label>
   <label class="check"><input type="checkbox" name="featured" <%= course.featured ? 'checked' : '' %>> Feature on the home page</label>
+  <label class="check"><input type="checkbox" name="sequential" <%= course.sequential !== 0 ? 'checked' : '' %>> Learners must finish each module before the next one opens</label>
   <button class="btn btn-navy" style="margin-top:10px"><%= course.id ? 'Save course' : 'Add course' %></button>
 </form>
 <% if (!course.id) { %>

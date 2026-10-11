@@ -18,9 +18,20 @@
       <label class="field"><span>Deadline</span><input type="date" name="due_date" value="<%= lesson.due_date || '' %>"><small>Leave blank for no deadline.</small></label>
       <label class="field"><span>Total marks</span><input type="number" name="total_marks" min="1" max="10000" step="0.5" value="<%= lesson.total_marks || '' %>" placeholder="e.g. 100"><small>Leave blank if this assignment isn’t marked.</small></label>
     </div>
-    <label class="check"><input type="radio" name="assign_to" value="all" <%= lesson.assign_to !== 'selected' ? 'checked' : '' %>> All learners on this course</label>
+    <label class="check"><input type="radio" name="assign_to" value="all" <%= !['selected', 'batches'].includes(lesson.assign_to) ? 'checked' : '' %>> All learners on this course</label>
+    <label class="check"><input type="radio" name="assign_to" value="batches" <%= lesson.assign_to === 'batches' ? 'checked' : '' %>> Only these batches</label>
+    <div class="pick-box" data-for="batches">
+      <% if (!batches.length) { %><p class="small muted" style="margin:0">This course has no batches yet. <a href="/admin/courses/<%= course.id %>/batches">Set up batches</a></p><% } %>
+      <% batches.forEach(bt => { const on = bt.id in pickedBatches; %>
+        <div class="pick-row">
+          <label class="check" style="margin:0"><input type="checkbox" name="batches" value="<%= bt.id %>" <%= on ? 'checked' : '' %>> <%= bt.name %> <span class="ln"><%= bt.code %></span> <span class="small muted"><%= bt.size %> learner<%= bt.size === 1 ? '' : 's' %></span></label>
+          <label class="small">Batch deadline <input type="date" name="bdue_<%= bt.id %>" value="<%= pickedBatches[bt.id] || '' %>" aria-label="Deadline for <%= bt.name %>"></label>
+        </div>
+      <% }) %>
+      <% if (batches.length) { %><p class="small muted" style="margin:10px 0 0">A batch deadline overrides the main one for that batch. Learners who join a ticked batch later get the assignment too.</p><% } %>
+    </div>
     <label class="check"><input type="radio" name="assign_to" value="selected" <%= lesson.assign_to === 'selected' ? 'checked' : '' %>> Only the learners I choose</label>
-    <div id="pick-box" class="pick-box">
+    <div class="pick-box" data-for="selected">
       <% if (!learners.length) { %><p class="small muted" style="margin:0">No learners are enrolled on this course yet.</p><% } %>
       <% learners.forEach(l => { const on = l.id in picked; %>
         <div class="pick-row">
@@ -55,12 +66,13 @@
   <button class="btn btn-navy"><%= isTask ? 'Save assignment' : 'Save lesson' %></button>
 </form>
 <script>
-  // Show assignment-only options only when "Assignment" is chosen, and the learner list only for "Only the learners I choose"
+  // Show assignment-only options only when "Assignment" is chosen, and the batch / learner list only under its own option
   (function () {
-    const form = document.querySelector('.lesson-form'), kind = document.getElementById('kind'), pick = document.getElementById('pick-box');
+    const form = document.querySelector('.lesson-form'), kind = document.getElementById('kind');
     function sync() {
       form.classList.toggle('is-task', kind.value === 'assignment');
-      pick.hidden = !(form.querySelector('input[name=assign_to]:checked') || {}).value || form.querySelector('input[name=assign_to]:checked').value !== 'selected';
+      const to = (form.querySelector('input[name=assign_to]:checked') || {}).value;
+      form.querySelectorAll('.pick-box[data-for]').forEach(box => { box.hidden = box.dataset.for !== to; });
     }
     form.addEventListener('change', sync); sync();
   })();

@@ -1,0 +1,98 @@
+<%- include('../partials/admin-header') %>
+<div class="admin-top">
+  <div><a href="/admin/courses/<%= course.id %>/content" class="small"><%= course.title %></a><h1>Learners and batches</h1></div>
+  <div class="row-actions"><a class="btn btn-line btn-sm" href="/admin/courses/<%= course.id %>/content">Course content</a></div>
+</div>
+<p class="muted">Split this course’s learners into batches. A learner is given their learner number when they join a batch: the batch code followed by their place in it, for example <span class="ln"><%= suggested %>-001</span>. Numbers are never given out twice, so a learner who moves batch gets a new number in the new batch.</p>
+
+<% const total = unbatched.length + batches.reduce((n, b) => n + b.learners.length, 0); %>
+<% if (courseAvg !== null) { %><p class="small">Average progress across the course: <strong><%= courseAvg %>%</strong>. Each learner’s bar counts the lessons and assignments set for them.</p><% } %>
+<% if (batches.length && total) { %>
+  <form id="move" method="post" action="/admin/courses/<%= course.id %>/batches/assign" class="panel inline-form move-bar"><%- include('../partials/csrf') %>
+    <label class="field"><span>Move the ticked learners to</span>
+      <select name="batch_id">
+        <% batches.forEach(b => { %><option value="<%= b.id %>"><%= b.name %> (<%= b.code %>) · <%= b.size %><%= b.capacity ? ` of ${b.capacity}` : '' %> learners</option><% }) %>
+        <option value="">No batch (withdraws their learner number)</option>
+      </select>
+    </label>
+    <button class="btn btn-navy btn-sm">Move <span data-picked>0</span> learners</button>
+  </form>
+<% } %>
+
+<% const row = (l, group) => { %>
+  <label class="lesson-row batch-row">
+    <span class="person">
+      <% if (batches.length) { %><input type="checkbox" name="enrolments" value="<%= l.id %>" form="move" data-group="<%= group %>" aria-label="Select <%= l.name %>"><% } %>
+      <% if (l.learner_number) { %><span class="ln"><%= l.learner_number %></span><% } %>
+      <span><a href="/admin/students/<%= l.user_id %>"><%= l.name %></a><br><span class="small muted"><%= l.email %></span></span>
+    </span>
+    <span class="row-progress">
+      <%- include('../partials/progress', { p: l.progress, label: `Progress for ${l.name}` }) %>
+      <% if (l.status !== 'active') { %><span class="status <%= l.status %>"><%= l.status %></span><% } %>
+    </span>
+  </label>
+<% } %>
+
+<div class="module-box">
+  <div class="module-head">
+    <% if (batches.length && unbatched.length) { %><input type="checkbox" data-all="none" aria-label="Select all learners not in a batch"><% } %>
+    <strong>Not in a batch</strong><span class="small muted"><%= unbatched.length %> learner<%= unbatched.length === 1 ? '' : 's' %></span>
+  </div>
+  <% unbatched.forEach(l => row(l, 'none')) %>
+  <% if (!unbatched.length) { %><div class="lesson-row muted small"><%= total ? 'Every learner on this course is in a batch.' : 'No learners are enrolled on this course yet.' %></div><% } %>
+</div>
+
+<% batches.forEach(b => { %>
+  <div class="module-box">
+    <div class="module-head">
+      <% if (b.learners.length) { %><input type="checkbox" data-all="<%= b.id %>" aria-label="Select all learners in <%= b.name %>"><% } %>
+      <strong><%= b.name %></strong><span class="ln"><%= b.code %></span>
+      <span class="small muted">
+        <%= b.size %><%= b.capacity ? ` of ${b.capacity}` : '' %> learner<%= (b.capacity || b.size) === 1 ? '' : 's' %><%= b.capacity && b.size >= b.capacity ? ' · full' : '' %>
+        <%= b.start_date ? ` · starts ${dueDate(b.start_date)}` : '' %><%= b.end_date ? ` · ends ${dueDate(b.end_date)}` : '' %><%= b.avg !== null ? ` · average progress ${b.avg}%` : '' %>
+      </span>
+      <details class="batch-edit">
+        <summary class="btn btn-line btn-sm">Edit</summary>
+        <form method="post" action="/admin/batches/<%= b.id %>" class="inline-form"><%- include('../partials/csrf') %>
+          <label class="field"><span>Name</span><input type="text" name="name" value="<%= b.name %>" required></label>
+          <label class="field"><span>Code</span><input type="text" name="code" value="<%= b.code %>" <%= b.next_number > 1 ? 'readonly title="Fixed once learner numbers have been issued"' : '' %> style="text-transform:uppercase"></label>
+          <label class="field"><span>Capacity</span><input type="number" name="capacity" min="1" value="<%= b.capacity || '' %>" placeholder="No limit"></label>
+          <label class="field"><span>Start date</span><input type="date" name="start_date" value="<%= b.start_date || '' %>"></label>
+          <label class="field"><span>End date</span><input type="date" name="end_date" value="<%= b.end_date || '' %>"></label>
+          <button class="btn btn-navy btn-sm">Save</button>
+          <% if (!b.learners.length) { %><button class="btn btn-danger btn-sm" name="delete" value="1" onclick="return confirm('Delete <%= b.name %>?')">Delete batch</button><% } %>
+        </form>
+      </details>
+    </div>
+    <% b.learners.forEach(l => row(l, b.id)) %>
+    <% if (!b.learners.length) { %><div class="lesson-row muted small">No learners yet. Tick learners above and move them here.</div><% } %>
+  </div>
+<% }) %>
+
+<form class="form-card inline-form" method="post" action="/admin/courses/<%= course.id %>/batches" style="max-width:none"><%- include('../partials/csrf') %>
+  <label class="field"><span>New batch</span><input type="text" name="name" placeholder="e.g. January 2027 intake" required></label>
+  <label class="field" style="max-width:200px"><span>Code</span><input type="text" name="code" placeholder="<%= suggested %>" style="text-transform:uppercase"></label>
+  <label class="field" style="max-width:130px"><span>Capacity</span><input type="number" name="capacity" min="1" placeholder="No limit"></label>
+  <label class="field" style="max-width:170px"><span>Start date</span><input type="date" name="start_date"></label>
+  <label class="field" style="max-width:170px"><span>End date</span><input type="date" name="end_date"></label>
+  <button class="btn btn-navy">Add batch</button>
+</form>
+<p class="small muted">Leave the code blank to use <strong><%= suggested %></strong>. The code can be changed until the batch’s first learner number is issued.</p>
+
+<script>
+(() => {
+  const form = document.getElementById('move');
+  if (!form) return;
+  const boxes = () => [...document.querySelectorAll('input[name=enrolments]')];
+  const update = () => { form.querySelector('[data-picked]').textContent = boxes().filter(b => b.checked).length; };
+  document.querySelectorAll('[data-all]').forEach(all => all.addEventListener('change', () => {
+    boxes().filter(b => b.dataset.group === all.dataset.all).forEach(b => { b.checked = all.checked; });
+    update();
+  }));
+  document.addEventListener('change', e => { if (e.target.name === 'enrolments') update(); });
+  form.addEventListener('submit', e => {
+    if (form.batch_id.value === '' && !confirm('Take the ticked learners out of their batch? Their learner numbers will be withdrawn and not reused.')) e.preventDefault();
+  });
+})();
+</script>
+<%- include('../partials/admin-footer') %>

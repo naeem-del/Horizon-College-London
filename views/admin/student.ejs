@@ -65,7 +65,18 @@
     <h3>Enrolments</h3>
     <% enrolments.forEach(e => { %>
       <div class="lesson-row" style="padding-left:0;padding-right:0">
-        <span><strong><%= e.title %></strong><br><span class="small muted"><%= e.pct %>% complete</span></span>
+        <span><strong><%= e.title %></strong><br>
+          <% if (e.learner_number) { %><span class="ln"><%= e.learner_number %></span> <% } %><% if (e.batch_name) { %><span class="small muted"><%= e.batch_name %></span><% } %>
+          <%- include('../partials/progress', { p: e.progress, label: `Progress on ${e.title}` }) %>
+          <% if (e.batches && e.batches.length) { %>
+            <form method="post" action="/admin/enrolments/<%= e.id %>/batch" style="display:block;margin-top:6px"><%- include('../partials/csrf') %>
+              <select name="batch_id" onchange="if (this.value || confirm('Take them out of the batch? Their learner number will be withdrawn.')) this.form.submit(); else this.value = '<%= e.batch_id || '' %>'" aria-label="Batch for <%= e.title %>">
+                <option value="" <%= e.batch_id ? '' : 'selected' %>><%= e.batch_id ? 'No batch' : 'Choose a batch…' %></option>
+                <% e.batches.forEach(b => { const full = b.capacity && b.size >= b.capacity && b.id !== e.batch_id; %><option value="<%= b.id %>" <%= b.id === e.batch_id ? 'selected' : '' %> <%= full ? 'disabled' : '' %>><%= b.name %> (<%= b.code %>)<%= full ? ' · full' : '' %></option><% }) %>
+              </select>
+            </form>
+          <% } else if (e.batches) { %><a class="small" href="/admin/courses/<%= e.course_id %>/batches" style="display:block;margin-top:4px">Set up batches for this course</a><% } %>
+        </span>
         <% if (user.role === 'admin') { %>
         <form method="post" action="/admin/enrolments/<%= e.id %>"><%- include('../partials/csrf') %>
           <select name="status" onchange="this.form.submit()" aria-label="Enrolment status"><% ['pending','active','completed','cancelled'].forEach(s => { %><option <%= e.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select>

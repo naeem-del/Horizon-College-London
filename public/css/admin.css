@@ -120,3 +120,23 @@ td form { display: inline; }
 .marked-record { margin-top: 12px; padding: 14px 16px; background: var(--mist); border: 1px solid var(--line); border-radius: var(--r-sm); }
 .marked-head { margin: 0 0 10px; font-weight: 600; color: var(--navy); font-size: .92rem; }
 .marked-record .facts { margin-bottom: 6px; }
+
+/* Batches */
+.move-bar { position: sticky; top: 0; z-index: 2; margin-bottom: 18px; }
+.move-bar .field { max-width: 460px; }
+.batch-row { cursor: pointer; }
+.batch-row:hover { background: #FAFBFD; }
+.batch-row input[type=checkbox], .module-head input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--navy); flex: none; }
+.batch-edit { margin-left: auto; }
+.batch-edit[open] { flex-basis: 100%; margin-left: 0; }
+.batch-edit summary { list-style: none; display: inline-block; }
+.batch-edit summary::-webkit-details-marker { display: none; }
+.batch-edit[open] summary { margin-bottom: 12px; }
+.batch-edit .field { min-width: 140px; }
+
+/* Learner progress (staff views) */
+.progress { display: grid; gap: 4px; margin-top: 6px; }
+.progress .bar { max-width: 260px; }
+.row-progress { display: flex; align-items: center; gap: 12px; flex: 0 1 300px; justify-content: flex-end; }
+.row-progress .progress { flex: 1; margin: 0; min-width: 160px; }
+@media (max-width: 600px) { .batch-row { flex-wrap: wrap; } .row-progress { flex-basis: 100%; justify-content: flex-start; } }

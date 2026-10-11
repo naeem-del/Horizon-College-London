@@ -1,0 +1,5 @@
+<%# Progress bar with "3 of 8 complete · 38%"; pass { p: learning.progress(...) } and optionally { label } %>
+<div class="progress">
+  <div class="bar" role="progressbar" aria-valuenow="<%= p.pct %>" aria-valuemin="0" aria-valuemax="100" aria-label="<%= typeof label !== 'undefined' ? label : 'Course progress' %>"><i style="width:<%= p.pct %>%"></i></div>
+  <span class="small muted"><%= p.total ? `${p.done} of ${p.total} complete · ${p.pct}%` : 'No lessons yet' %></span>
+</div>

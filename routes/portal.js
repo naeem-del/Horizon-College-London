@@ -13,6 +13,12 @@ const isStaff = req => req.user.role !== 'student';
 const progress = (req, courseId) => learning.progress(req.user.id, courseId, isStaff(req));
 const outline = (req, courseId) => learning.outline(req.user.id, courseId, isStaff(req));
 
+// Sends a learner who tries to open a locked module back to the course page, saying which module to finish first
+function refuseLocked(req, res, course, lesson) {
+  flash(req, 'info', `“${lesson.title}” opens once you’ve finished the module “${lesson.blockedBy}”.`);
+  return res.redirect(`/portal/courses/${course.slug}`);
+}
+
 function loadCourseForLearner(req, slug) {
   const course = db.prepare(`SELECT c.*, ab.name body_name FROM courses c LEFT JOIN awarding_bodies ab ON ab.id=c.awarding_body_id WHERE c.slug=?`).get(slug);
   if (!course) return {};
@@ -51,7 +57,7 @@ router.get('/courses/:slug', (req, res, next) => {
   }
   const { modules, flat } = outline(req, course.id);
   const next_ = flat.find(l => !l.done) || flat[0];
-  res.render('portal/course', { title: course.title, course, modules, prog: progress(req, course.id), nextLesson: next_ });
+  res.render('portal/course', { title: course.title, course, enrolment, modules, prog: progress(req, course.id), nextLesson: next_ });
 });
 
 router.get('/courses/:slug/lessons/:id', (req, res, next) => {
@@ -62,6 +68,7 @@ router.get('/courses/:slug/lessons/:id', (req, res, next) => {
   const idx = flat.findIndex(l => l.id === Number(req.params.id));
   if (idx === -1) return next();
   const lesson = flat[idx];
+  if (lesson.locked) return refuseLocked(req, res, course, lesson);
   const submissions = db.prepare('SELECT * FROM submissions WHERE user_id=? AND lesson_id=? ORDER BY id DESC').all(req.user.id, lesson.id);
   let scormData = null;
   if (lesson.scorm_folder) {
@@ -98,12 +105,14 @@ router.post('/courses/:slug/lessons/:id/complete', (req, res, next) => {
   const { flat } = outline(req, course.id);
   const idx = flat.findIndex(l => l.id === Number(req.params.id));
   if (idx === -1) return next();
+  if (flat[idx].locked) return refuseLocked(req, res, course, flat[idx]);
   // SCORM lessons are completed by the package itself, not by the button
   if (flat[idx].scorm_folder) return res.redirect(`/portal/courses/${course.slug}/lessons/${flat[idx].id}`);
   if (req.body.undo) db.prepare('DELETE FROM lesson_progress WHERE user_id=? AND lesson_id=?').run(req.user.id, flat[idx].id);
   else markDone(req, course.id, flat[idx].id);
-  const nextL = flat[idx + 1];
-  res.redirect(!req.body.undo && nextL ? `/portal/courses/${course.slug}/lessons/${nextL.id}` : `/portal/courses/${course.slug}/lessons/${flat[idx].id}`);
+  // Look again: finishing this lesson may have just opened the next module
+  const nextL = outline(req, course.id).flat[idx + 1];
+  res.redirect(!req.body.undo && nextL && !nextL.locked ? `/portal/courses/${course.slug}/lessons/${nextL.id}` : `/portal/courses/${course.slug}/lessons/${flat[idx].id}`);
 });
 
 // Multer has already saved the file by the time we know the upload isn't allowed, so remove it
@@ -113,6 +122,7 @@ router.post('/courses/:slug/lessons/:id/submit', uploadEvidence.single('file'), 
   if (!course || !allowed) { discardUpload(req); return next(); }
   const lesson = outline(req, course.id).flat.find(l => l.id === Number(req.params.id) && l.kind === 'assignment');
   if (!lesson) { discardUpload(req); return next(); }
+  if (lesson.locked) { discardUpload(req); return refuseLocked(req, res, course, lesson); }
   if (!req.file) {
     flash(req, 'error', 'Choose a file to upload. Accepted: PDF, Word, Excel, PowerPoint, images, MP4 or ZIP, up to 20 MB.');
     return res.redirect(req.originalUrl.replace(/\/submit$/, ''));
@@ -125,11 +135,14 @@ router.post('/courses/:slug/lessons/:id/submit', uploadEvidence.single('file'), 
 });
 
 // ---------- SCORM ----------
-// A SCORM lesson the user may open: staff, or a learner with an active/completed enrolment on its course
+// A SCORM lesson the user may open: staff, or a learner with an active/completed enrolment on its course whose module is open
 function scormLesson(req) {
   const l = db.prepare(`SELECT l.id, l.scorm_folder, l.scorm_version, c.slug FROM lessons l JOIN modules m ON m.id=l.module_id
     JOIN courses c ON c.id=m.course_id WHERE l.id=? AND l.kind='lesson' AND l.scorm_folder IS NOT NULL`).get(req.params.id);
-  return l && loadCourseForLearner(req, l.slug).allowed ? l : null;
+  const { course, allowed } = l ? loadCourseForLearner(req, l.slug) : {};
+  if (!allowed) return null;
+  const own = outline(req, course.id).flat.find(x => x.id === l.id);
+  return own && !own.locked ? l : null;
 }
 
 // Package files are served from our own site (not /uploads) so the package can reach the player's SCORM API

@@ -34,6 +34,7 @@
         <span class="status <%= e.status %>"><%= { pending: 'Awaiting confirmation', active: 'In progress', completed: 'Completed', cancelled: 'Cancelled' }[e.status] %></span>
         <h3><%= e.title %></h3>
         <p class="small muted" style="margin:0 0 12px"><%= [e.level, e.body_name].filter(Boolean).join(', ') %></p>
+        <% if (e.learner_number) { %><p class="small" style="margin:0 0 12px">Learner number <span class="ln"><%= e.learner_number %></span></p><% } %>
         <% if (open) { %>
           <div class="bar" role="progressbar" aria-valuenow="<%= e.progress.pct %>" aria-valuemin="0" aria-valuemax="100"><i style="width:<%= e.progress.pct %>%"></i></div>
           <p class="small muted" style="margin:6px 0 0"><%= e.progress.done %> of <%= e.progress.total %> complete</p>

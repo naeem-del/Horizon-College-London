@@ -4,7 +4,12 @@
   <p class="small muted" style="margin:6px 10px 0"><%= prog.pct %>% complete</p>
   <% modules.forEach(m => { %>
     <h4><%= m.title %></h4>
-    <% m.lessons.forEach(l => { %>
+    <% if (m.locked && m.lessons.length) { %>
+      <p class="locked-note">Opens when you finish “<%= m.blockedBy %>”</p>
+      <% m.lessons.forEach(l => { %>
+        <span class="locked-item"><span class="tick lock" aria-hidden="true"></span><span><%= l.title %><span class="sr-only"> (locked)</span></span></span>
+      <% }) %>
+    <% } else m.lessons.forEach(l => { %>
       <a href="/portal/courses/<%= course.slug %>/lessons/<%= l.id %>" class="<%= typeof lesson !== 'undefined' && lesson.id === l.id ? 'on' : '' %>">
         <span class="tick <%= l.done ? 'done' : '' %>"></span><span><%= l.title %><% if (l.kind === 'assignment') { const ds = dueState(l.due, l.sub_status); %> <span class="small muted">(assignment)</span><% if (ds) { %> <span class="status <%= ds.cls %>" style="font-size:.7rem"><%= ds.text %></span><% } %><% } %></span>
       </a>

@@ -11,6 +11,7 @@
       <td><span class="status <%= c.published ? 'active' : '' %>"><%= c.published ? 'Published' : 'Draft' %></span><% if (c.featured) { %> <span class="status completed">Featured</span><% } %></td>
       <td class="row-actions">
         <a class="btn btn-navy btn-sm" href="/admin/courses/<%= c.id %>/content">Content</a>
+        <a class="btn btn-line btn-sm" href="/admin/courses/<%= c.id %>/batches">Learners &amp; batches</a>
         <% if (admin) { %>
         <a class="btn btn-line btn-sm" href="/admin/courses/<%= c.id %>/edit">Edit</a>
         <a class="btn btn-line btn-sm" href="/courses/<%= c.slug %>" target="_blank">View</a>

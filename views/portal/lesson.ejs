@@ -63,7 +63,8 @@
             <% } else { %><button class="btn btn-gold btn-sm"><%= next ? 'Complete and continue' : 'Mark complete' %></button><% } %>
           </form>
         <% } %>
-        <% if (next && (lesson.done || lesson.kind === 'assignment')) { %><a class="btn btn-navy btn-sm" href="/portal/courses/<%= course.slug %>/lessons/<%= next.id %>">Next</a>
+        <% if (next && next.locked && !lesson.scorm_folder) { %><span class="small muted locked-next">The next module opens when you’ve finished everything in “<%= next.blockedBy %>”.</span>
+        <% } else if (next && (lesson.done || lesson.kind === 'assignment')) { %><a class="btn btn-navy btn-sm" href="/portal/courses/<%= course.slug %>/lessons/<%= next.id %>">Next</a>
         <% } else if (next && lesson.scorm_folder) { %><a class="btn btn-gold btn-sm" data-scorm-done hidden href="/portal/courses/<%= course.slug %>/lessons/<%= next.id %>">Completed: continue</a><% } %>
       </div>
     </div>
