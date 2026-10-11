@@ -5,18 +5,22 @@
   "main": "server.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
-    "dev": "node --disable-warning=ExperimentalWarning --watch server.js"
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.4",
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "multer": "^2.4.0",
-    "nodemailer": "^10.0.13"
+    "nodemailer": "^10.0.13",
+    "pg": "^8.23.1"
   },
   "engines": {
     "node": ">=22.13"
