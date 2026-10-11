@@ -1,43 +1,18 @@
-// SCORM 1.2 / 2004 packages: unzip an uploaded package, find what to launch from imsmanifest.xml,
-// and work out a learner's status from the data the package reports back.
-// The unzipper uses Node's built-in zlib, so there is nothing extra to install.
-const fs = require('fs');
-const path = require('path');
-const zlib = require('zlib');
+// SCORM 1.2 / 2004 packages. The admin's browser unzips a package and uploads its files to private storage under
+// scorm/<folder>/ (public/js/scorm-upload.js). This module reads imsmanifest.xml from there to set up the lessons,
+// hands out signed addresses for learners to play the package from our own domain (routes/scorm-content.js),
+// and works out a learner's status from the data the package reports back.
+const crypto = require('crypto');
+const storage = require('./storage');
 
-const ROOT = path.join(__dirname, 'uploads', 'scorm');
-
-// Extracts a .zip into dest. Rejects encrypted/ZIP64 archives and any entry that would land outside dest.
-function unzip(zipFile, dest) {
-  const buf = fs.readFileSync(zipFile);
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
-  if (eocd < 0) throw new Error('This file isn’t a valid .zip.');
-  const count = buf.readUInt16LE(eocd + 10);
-  let p = buf.readUInt32LE(eocd + 16);
-  if (count === 0xffff || p === 0xffffffff) throw new Error('This package is too large (ZIP64). Re-export it in smaller parts.');
-  const base = path.resolve(dest);
-  for (let n = 0; n < count; n++) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('This .zip is damaged.');
-    const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10);
-    const csize = buf.readUInt32LE(p + 20), nameLen = buf.readUInt16LE(p + 28);
-    const extraLen = buf.readUInt16LE(p + 30), commentLen = buf.readUInt16LE(p + 32), local = buf.readUInt32LE(p + 42);
-    const name = buf.toString(flags & 0x800 ? 'utf8' : 'latin1', p + 46, p + 46 + nameLen).replace(/\\/g, '/');
-    p += 46 + nameLen + extraLen + commentLen;
-    if (flags & 1) throw new Error('This package is password-protected.');
-    const target = path.resolve(base, name);
-    if (target !== base && !target.startsWith(base + path.sep)) throw new Error('This package contains unsafe file paths.');
-    if (name.endsWith('/')) { fs.mkdirSync(target, { recursive: true }); continue; }
-    const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-    const data = buf.subarray(start, start + csize);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    if (method === 0) fs.writeFileSync(target, data);
-    else if (method === 8) fs.writeFileSync(target, zlib.inflateRawSync(data));
-    else throw new Error(`This package uses an unsupported compression method (${method}).`);
-  }
-}
+// ---------- Package folders and file paths ----------
+const newFolder = () => `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+const validFolder = f => /^\d{13}-[a-f0-9]{16}$/.test(String(f || ''));
+// A file path inside a package: relative, no "." or ".." parts, and only characters Supabase Storage accepts in keys
+const safePath = p => typeof p === 'string' && p.length > 0 && p.length <= 500 && /^[\w/!\-.*'() &$@=;+,]+$/.test(p)
+  && p.split('/').every(part => part && part !== '.' && part !== '..');
+// The folder inside the package that holds imsmanifest.xml: '' (the top) or up to two levels, e.g. 'course/'
+const safeHome = h => h === '' || (typeof h === 'string' && h.endsWith('/') && safePath(h.slice(0, -1)) && h.split('/').length <= 3);
 
 const attrs = tag => Object.fromEntries([...tag.matchAll(/([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)].map(m => [m[1].toLowerCase(), m[3] ?? m[4]]));
 const decode = s => String(s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
@@ -134,43 +109,52 @@ function readManifest(xml) {
   return { version, title, description, units };
 }
 
-// Unzips an uploaded package into uploads/scorm/<folder> and returns its structure: version, title, description,
-// units -> lessons (each with a launch path inside the folder) and `launch`, the first lesson's page.
-// The manifest may sit in a sub-folder if the zip was made from the folder rather than its contents.
-function install(zipFile) {
-  const folder = Date.now() + '-' + Math.random().toString(16).slice(2, 10);
-  const dest = path.join(ROOT, folder);
-  try {
-    unzip(zipFile, dest);
-    const findHome = (dir, depth) => {
-      if (fs.existsSync(path.join(dir, 'imsmanifest.xml'))) return dir;
-      if (depth >= 2) return null;
-      for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (d.isDirectory()) { const f = findHome(path.join(dir, d.name), depth + 1); if (f) return f; }
-      }
-      return null;
-    };
-    const home = findHome(dest, 0);
-    if (!home) throw new Error('This isn’t a SCORM package: imsmanifest.xml is missing.');
-    const m = readManifest(fs.readFileSync(path.join(home, 'imsmanifest.xml'), 'utf8'));
-    const sub = path.relative(dest, home).split(path.sep).filter(Boolean).join('/');
-    for (const u of m.units) for (const l of u.lessons) l.launch = (sub ? sub + '/' : '') + l.launch;
-    const all = m.units.flatMap(u => u.lessons);
-    return { folder, version: m.version, title: m.title || all[0].title, description: m.description, units: m.units, launch: all[0].launch, count: all.length };
-  } catch (err) {
-    fs.rm(dest, { recursive: true, force: true }, () => {});
-    throw err;
-  } finally {
-    fs.unlink(zipFile, () => {});
+// Reads the manifest of a package the browser has uploaded and returns its structure: version, title, description,
+// units -> lessons (each with a launch path inside the folder), `launch` (the first lesson's page) and `count`.
+// `home` is where imsmanifest.xml sits, in case the zip was made from the folder rather than its contents.
+async function install(folder, home) {
+  if (!validFolder(folder) || !safeHome(home)) throw new Error('The package upload didn’t complete. Please upload it again.');
+  const xml = await storage.readText('scorm', `${folder}/${home}imsmanifest.xml`);
+  if (xml === null) throw new Error('This isn’t a SCORM package: imsmanifest.xml is missing.');
+  const m = readManifest(xml);
+  for (const u of m.units) for (const l of u.lessons) {
+    l.launch = home + l.launch;
+    if (!safePath(launchFile(l.launch))) throw new Error(`The package launches a page outside itself (${l.launch}).`);
   }
+  const all = m.units.flatMap(u => u.lessons);
+  if (!(await storage.exists('scorm', `${folder}/${launchFile(all[0].launch)}`))) throw new Error(`The launch page ${launchFile(all[0].launch)} isn’t in the package.`);
+  return { folder, version: m.version, title: m.title || all[0].title, description: m.description, units: m.units, launch: all[0].launch, count: all.length };
+}
+// The file a launch address points at: without its ?query or #fragment, and with %20 and the like decoded
+function launchFile(launch) {
+  const file = String(launch).split(/[?#]/)[0];
+  try { return decodeURIComponent(file); } catch { return file; }
 }
 
 // Deletes a package's files once no lesson uses them any more (one package can feed several lessons).
 // Call it after the lessons have been changed or deleted.
 async function remove(folder) {
-  if (!folder || path.basename(folder) !== folder) return;
+  if (!validFolder(folder)) return;
   if (await require('./db').db.get('SELECT 1 FROM lessons WHERE scorm_folder=? LIMIT 1', folder)) return;
-  fs.rm(path.join(ROOT, folder), { recursive: true, force: true }, () => {});
+  await storage.removeTree('scorm', folder);
+}
+
+// ---------- Playing a package ----------
+// The lesson page gives each visit an address like /scorm-content/<folder>/<expiry>.<signature>/ under which the
+// package's files are served. The signature proves the page checked the learner's access, so the many requests a
+// package makes need no session or database lookups. Addresses last 4 hours; reloading the lesson gives a new one.
+const SIGNED_FOR = 4 * 60 * 60;
+const signature = (folder, exp) => crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev-only-secret-change-me')
+  .update(`scorm-content:${folder}:${exp}`).digest('base64url');
+function contentBase(folder) {
+  const exp = Math.floor(Date.now() / 1000) + SIGNED_FOR;
+  return `/scorm-content/${folder}/${exp}.${signature(folder, exp)}/`;
+}
+function checkToken(folder, token) {
+  const [exp, sig = ''] = String(token).split('.');
+  if (!validFolder(folder) || !(Number(exp) > Date.now() / 1000)) return false;
+  const want = signature(folder, exp);
+  return sig.length === want.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
 }
 
 // Status, score and whether the lesson counts as complete, from the data model the package saved
@@ -188,4 +172,4 @@ function summarise(version, cmi) {
   return { status, score, complete: status === 'completed' || status === 'passed', time: cmi['cmi.core.total_time'] || '' };
 }
 
-module.exports = { ROOT, install, remove, summarise };
+module.exports = { newFolder, validFolder, safePath, safeHome, readManifest, install, remove, contentBase, checkToken, summarise };

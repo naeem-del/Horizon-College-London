@@ -1,6 +1,4 @@
 const crypto = require('crypto');
-const multer = require('multer');
-const path = require('path');
 const { db } = require('../db');
 
 // Attach the logged-in user, flash messages and CSRF token to every view
@@ -22,7 +20,7 @@ async function locals(req, res, next) {
 
 function flash(req, type, text) { req.session.flash = { type, text }; }
 
-// Checked after multer so multipart forms work too
+// Every POST must carry the session’s token (forms include it from partials/csrf.ejs)
 function csrf(req, res, next) {
   if (req.method !== 'POST') return next();
   const token = req.body && req.body._csrf;
@@ -44,15 +42,4 @@ function requireRole(...roles) {
   };
 }
 
-// SCORM packages are still sent to the server and unzipped here (every other file goes straight to storage,
-// see storage.js). The zip lands in uploads/scorm and scorm.js unzips it into its own folder.
-const uploadScorm = multer({
-  storage: multer.diskStorage({
-    destination: path.join(__dirname, '..', 'uploads', 'scorm'),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + crypto.randomBytes(4).toString('hex') + '.zip'),
-  }),
-  limits: { fileSize: 500 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, file.fieldname === 'scorm' && path.extname(file.originalname).toLowerCase() === '.zip'),
-}).single('scorm');
-
-module.exports = { locals, flash, csrf, requireLogin, requireRole, uploadScorm };
+module.exports = { locals, flash, csrf, requireLogin, requireRole };

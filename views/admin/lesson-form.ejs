@@ -2,7 +2,7 @@
 <% const isTask = lesson.kind === 'assignment'; %>
 <div class="admin-top"><h1><%= lesson.id ? (isTask ? 'Edit assignment' : 'Edit lesson') : (isTask ? 'Set an assignment' : 'Add lesson') %></h1><a href="/admin/courses/<%= module.course_id %>/content">Back to course content</a></div>
 <p class="muted"><%= course.title %> · Module: <strong><%= module.title %></strong></p>
-<form class="form-card lesson-form" method="post" action="/admin/lessons/save" enctype="multipart/form-data" data-direct-upload="/admin/uploads/sign">
+<form class="form-card lesson-form" method="post" action="/admin/lessons/save" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %>
   <input type="hidden" name="id" value="<%= lesson.id || '' %>"><input type="hidden" name="module_id" value="<%= module.id %>">
   <label class="field"><span>Title</span><input type="text" name="title" value="<%= lesson.title || '' %>" required></label>
@@ -48,9 +48,9 @@
 
   <fieldset class="lesson-only">
     <legend>SCORM package <small class="muted" style="font-weight:400">(optional)</small></legend>
-    <label class="field" style="margin-bottom:0"><span><%= lesson.scorm_folder ? 'Replace the package' : 'Upload a SCORM .zip' %></span><input type="file" name="scorm" accept=".zip,application/zip">
-      <small>A SCORM 1.2 or 2004 package exported from Articulate, Captivate, iSpring, Elucidat and similar tools, up to 500 MB. Learners play it inside the lesson, and it marks itself complete when they finish or pass it.</small>
-      <% if (lesson.scorm_folder) { %><small>Current: SCORM <%= lesson.scorm_version %> package, launches <a href="/portal/scorm/<%= lesson.id %>/content/<%= lesson.scorm_launch %>" target="_blank"><%= lesson.scorm_launch.split('?')[0] %></a>. Replacing or removing it clears learners’ saved progress in it.</small>
+    <label class="field" style="margin-bottom:0"><span><%= lesson.scorm_folder ? 'Replace the package' : 'Upload a SCORM .zip' %></span><input type="file" data-upload="scorm" data-sign-url="/admin/uploads/scorm-sign" data-max-mb="<%= uploadMB('scorm') %>" data-file-max-mb="<%= storageFileMB %>" accept=".zip,application/zip">
+      <small>A SCORM 1.2 or 2004 package exported from Articulate, Captivate, iSpring, Elucidat and similar tools, up to <%= uploadMB('scorm') %> MB. Learners play it inside the lesson, and it marks itself complete when they finish or pass it.</small>
+      <% if (lesson.scorm_folder) { %><small>Current: SCORM <%= lesson.scorm_version %> package, launches <%= lesson.scorm_launch.split('?')[0] %> (<a href="/portal/courses/<%= course.slug %>/lessons/<%= lesson.id %>" target="_blank">open the lesson</a>). Replacing or removing it clears learners’ saved progress in it.</small>
         <label class="check" style="margin-top:8px"><input type="checkbox" name="remove_scorm"> Remove this package</label><% } %></label>
   </fieldset>
 

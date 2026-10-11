@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "regions": ["dub1"],
+  "functions": {
+    "api/index.js": { "includeFiles": "views/**", "maxDuration": 60 }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}

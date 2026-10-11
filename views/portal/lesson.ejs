@@ -15,7 +15,7 @@
         <span class="scorm-state">Status <span id="scorm-status" class="status <%= scormStatusClass(st) %>"><%= st.replace(/^\w/, c => c.toUpperCase()) %></span></span>
         <button type="button" class="btn btn-line btn-sm scorm-full" id="scorm-full"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/></svg> Full screen</button>
       </div>
-      <div class="scorm-wrap"><iframe id="scorm-frame" data-src="/portal/scorm/<%= lesson.id %>/content/<%= lesson.scorm_launch %>" title="<%= lesson.title %>" allow="fullscreen; autoplay"></iframe></div>
+      <div class="scorm-wrap"><iframe id="scorm-frame" data-src="<%= scormData.contentUrl %>" title="<%= lesson.title %>" allow="fullscreen; autoplay"></iframe></div>
       <p class="scorm-note">Your progress is saved as you go, so you can leave and pick up where you left off. This lesson is marked complete when you finish the activity.</p>
       <script type="application/json" id="scorm-data"><%- JSON.stringify(scormData).replace(/</g, '\\u003c') %></script>
       <script src="/js/scorm-player.js"></script>

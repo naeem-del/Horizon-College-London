@@ -88,6 +88,8 @@ router.get('/courses/:slug/lessons/:id', async (req, res, next) => {
       version: lesson.scorm_version, saved: attempt ? JSON.parse(attempt.cmi) : {},
       learner: { id: String(req.user.id), name: me.last_name ? `${me.last_name}, ${me.first_name || ''}`.trim() : me.name },
       commitUrl: `/portal/scorm/${lesson.id}/commit`, csrf: req.session.csrf, done: !!lesson.done,
+      // Signed address the package's files are played from (routes/scorm-content.js)
+      contentUrl: scorm.contentBase(lesson.scorm_folder) + lesson.scorm_launch,
       // Where a SCORM 2004 package's own Next / Previous buttons (adl.nav.request) take the learner
       nextUrl: flat[idx + 1] ? `/portal/courses/${course.slug}/lessons/${flat[idx + 1].id}` : '',
       prevUrl: flat[idx - 1] ? `/portal/courses/${course.slug}/lessons/${flat[idx - 1].id}` : '',
@@ -173,15 +175,6 @@ async function scormLesson(req) {
   const own = (await outline(req, course.id)).flat.find(x => x.id === l.id);
   return own && !own.locked ? l : null;
 }
-
-// Package files are served from our own site (not /uploads) so the package can reach the player's SCORM API
-router.get('/scorm/:id/content/*file', async (req, res, next) => {
-  const l = await scormLesson(req);
-  if (!l) return next();
-  res.sendFile([].concat(req.params.file).join('/'), { root: path.join(scorm.ROOT, l.scorm_folder) }, err => {
-    if (err && !res.headersSent) res.status(err.status || 404).end();
-  });
-});
 
 // The player posts the package's whole data model here on commit, finish and when the page closes
 router.post('/scorm/:id/commit', async (req, res) => {

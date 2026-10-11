@@ -1,11 +1,10 @@
 // Creates (or updates) the two Supabase Storage buckets the app uses. Safe to run again.
 // Usage: npm run setup-storage
 require('dotenv').config({ quiet: true });
-const { client } = require('../storage');
+const { client, FILE_LIMIT_MB: largest } = require('../storage');
 
 const MB = 1024 * 1024;
 // Supabase Free caps every file at 50 MB; on Pro raise MAX_VIDEO_MB / MAX_FILE_MB and run this again
-const largest = Math.max(Number(process.env.MAX_VIDEO_MB) || 50, Number(process.env.MAX_FILE_MB) || 50, 20);
 const buckets = [
   { id: 'media', public: true, fileSizeLimit: largest * MB },
   { id: 'private', public: false, fileSizeLimit: largest * MB },

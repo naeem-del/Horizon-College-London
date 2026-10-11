@@ -1,6 +1,6 @@
 <%- include('../partials/admin-header') %>
 <div class="admin-top"><h1><%= course.id ? 'Edit course' : 'Add course' %></h1><a href="/admin/courses">Back to courses</a></div>
-<form class="form-card course-form" method="post" action="/admin/courses/save" enctype="multipart/form-data" data-direct-upload="/admin/uploads/sign">
+<form class="form-card course-form" method="post" action="/admin/courses/save" data-direct-upload="/admin/uploads/sign">
   <%- include('../partials/csrf') %><input type="hidden" name="id" value="<%= course.id || '' %>">
   <% if (!course.id) { %>
     <fieldset class="mode-pick">
@@ -9,7 +9,7 @@
       <label class="mode-card"><input type="radio" name="mode" value="scorm"><span><strong>Upload a SCORM package</strong><small>Upload a ready-made SCORM 1.2 or 2004 .zip. The course and its lesson are created from it in one step.</small></span></label>
     </fieldset>
     <div class="scorm-only">
-      <label class="field"><span>SCORM package</span><input type="file" name="scorm" accept=".zip,application/zip"><small>The .zip exported from Articulate, Captivate, iSpring, Elucidat or similar, up to 500 MB. Learners’ progress, scores and completion are recorded automatically.</small></label>
+      <label class="field"><span>SCORM package</span><input type="file" data-upload="scorm" data-sign-url="/admin/uploads/scorm-sign" data-max-mb="<%= uploadMB('scorm') %>" data-file-max-mb="<%= storageFileMB %>" accept=".zip,application/zip"><small>The .zip exported from Articulate, Captivate, iSpring, Elucidat or similar, up to <%= uploadMB('scorm') %> MB. It’s unzipped in your browser, so keep this page open until it finishes. Learners’ progress, scores and completion are recorded automatically.</small></label>
     </div>
   <% } %>
   <label class="field"><span>Title</span><input type="text" name="title" id="course-title" value="<%= course.title || '' %>" required><small class="scorm-only">Optional: leave blank to use the title inside the package.</small></label>
@@ -48,7 +48,7 @@
 <script>
   // Switch between the full course form and the SCORM upload
   (function () {
-    const form = document.querySelector('.course-form'), title = document.getElementById('course-title'), file = form.querySelector('input[name=scorm]');
+    const form = document.querySelector('.course-form'), title = document.getElementById('course-title'), file = form.querySelector('input[data-upload=scorm]');
     const button = form.querySelector('button.btn-navy');
     function sync() {
       const scorm = form.querySelector('input[name=mode]:checked').value === 'scorm';

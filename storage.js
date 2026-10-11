@@ -25,7 +25,11 @@ const UPLOADS = {
   attachment: { folder: 'files', exts: DOCS, max: (Number(process.env.MAX_FILE_MB) || 50) * MB, who: 'staff' },
   video: { folder: 'videos', exts: ['.mp4', '.webm', '.mov'], max: (Number(process.env.MAX_VIDEO_MB) || 50) * MB, who: 'staff' },
   evidence: { folder: 'evidence', exts: ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx', '.pptx', '.mp4', '.zip'], max: 20 * MB, who: 'learner' },
+  // A SCORM .zip isn't stored as one file: the browser unzips it and uploads each file (see scorm.js)
+  scorm: { folder: 'scorm', exts: ['.zip'], max: (Number(process.env.MAX_SCORM_MB) || 500) * MB, who: 'staff', unzipped: true },
 };
+// Largest single file the buckets accept (Supabase Free caps every file at 50 MB); scripts/setup-storage.js applies it
+const FILE_LIMIT_MB = Math.max(Number(process.env.MAX_VIDEO_MB) || 50, Number(process.env.MAX_FILE_MB) || 50, 20);
 
 const objectPath = (folder, name) => `${folder}/${path.basename(String(name))}`;
 const sizeText = bytes => `${Math.round(bytes / MB)} MB`;
@@ -86,4 +90,59 @@ async function signedUrl(folder, name, seconds = 60, downloadName) {
   return data.signedUrl;
 }
 
-module.exports = { UPLOADS, BUCKET, refuse, signUpload, receive, remove, signedUrl, sizeOf, client: sb };
+// ---------- Files inside a folder tree (unzipped SCORM packages): keys like "<package>/res/index.html" ----------
+const bucketOf = folder => sb.storage.from(BUCKET[folder]);
+
+// One-time upload links for several files at once: [{ path, url }] with path relative to `folder`
+function signUploads(folder, keys) {
+  return Promise.all(keys.map(async key => {
+    const { data, error } = await bucketOf(folder).createSignedUploadUrl(`${folder}/${key}`);
+    if (error) throw new Error(`Storage refused ${key}: ${error.message}`);
+    return { path: key, url: data.signedUrl };
+  }));
+}
+
+// Text of a stored file, or null when it isn't there
+async function readText(folder, key) {
+  const { data, error } = await bucketOf(folder).download(`${folder}/${key}`);
+  return error ? null : data.text();
+}
+
+async function exists(folder, key) {
+  const dir = `${folder}/${key}`.split('/').slice(0, -1).join('/'), name = key.split('/').pop();
+  const { data, error } = await bucketOf(folder).list(dir, { search: name, limit: 5 });
+  return !error && (data || []).some(f => f.name === name && f.id !== null);
+}
+
+// A short-lived link to a stored file by its key (no download name: the browser displays it)
+async function signedKeyUrl(folder, key, seconds) {
+  const { data, error } = await bucketOf(folder).createSignedUrl(`${folder}/${key}`, seconds);
+  return error ? null : data.signedUrl;
+}
+
+// Deletes everything under folder/prefix (Storage has no folders as such, so list them recursively first)
+async function removeTree(folder, prefix) {
+  const bucket = bucketOf(folder), keys = [];
+  async function walk(dir) {
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await bucket.list(dir, { limit: 1000, offset });
+      if (error) throw new Error(`Storage listing failed: ${error.message}`);
+      for (const item of data) {
+        if (item.id === null) await walk(`${dir}/${item.name}`); // a sub-folder
+        else keys.push(`${dir}/${item.name}`);
+      }
+      if (data.length < 1000) break;
+    }
+  }
+  await walk(`${folder}/${prefix}`);
+  for (let i = 0; i < keys.length; i += 1000) {
+    const { error } = await bucket.remove(keys.slice(i, i + 1000));
+    if (error) console.error(`Couldn't delete files under ${folder}/${prefix}: ${error.message}`);
+  }
+  return keys.length;
+}
+
+module.exports = {
+  UPLOADS, BUCKET, FILE_LIMIT_MB, refuse, signUpload, receive, remove, signedUrl, sizeOf,
+  signUploads, readText, exists, signedKeyUrl, removeTree, client: sb,
+};

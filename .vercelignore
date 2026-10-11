@@ -1,0 +1,4 @@
+# Never upload these to Vercel: secrets live in Vercel's Environment Variables, and data lives in Supabase
+.env
+data/
+uploads/

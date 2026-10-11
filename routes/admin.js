@@ -1,13 +1,12 @@
 const router = require('express').Router();
-const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db, slugify, toId } = require('../db');
-const fs = require('fs');
-const { requireRole, flash, csrf, uploadScorm } = require('../middleware');
+const { requireRole, flash } = require('../middleware');
 const storage = require('../storage');
 const links = require('../password-links');
-const { sendMail } = require('../mailer');
+const { waitUntil } = require('@vercel/functions');
+const mailer = require('../mailer');
 const { dueDate, markText } = require('../helpers');
 const learning = require('../learning');
 const scorm = require('../scorm');
@@ -39,11 +38,25 @@ router.use(async (req, res, next) => {
 // Signs a one-time storage link for a file the browser is about to upload (see public/js/direct-upload.js)
 router.post('/uploads/sign', async (req, res) => {
   const rule = storage.UPLOADS[req.body.purpose];
-  if (!rule || rule.who === 'learner' || (rule.who === 'admin' && !isAdmin(req))) return res.status(403).json({ error: 'You can’t upload this kind of file here.' });
+  if (!rule || rule.unzipped || rule.who === 'learner' || (rule.who === 'admin' && !isAdmin(req))) return res.status(403).json({ error: 'You can’t upload this kind of file here.' });
   const problem = storage.refuse(req.body.purpose, req.body.filename, Number(req.body.size));
   if (problem) return res.status(422).json({ error: problem });
   res.json(await storage.signUpload(req.body.purpose, req.body.filename));
 });
+// Upload links for the files of a SCORM package the browser is unzipping (public/js/scorm-upload.js), up to 100
+// per request. The first request gets a new package folder; later ones send it back.
+router.post('/uploads/scorm-sign', async (req, res) => {
+  let keys;
+  try { keys = JSON.parse(req.body.paths || '[]'); } catch { keys = null; }
+  if (!Array.isArray(keys) || !keys.length || keys.length > 100) return res.status(422).json({ error: 'Send between 1 and 100 file paths.' });
+  const bad = keys.find(k => !scorm.safePath(k));
+  if (bad !== undefined) return res.status(422).json({ error: `The package contains a file name that can’t be stored: ${String(bad).slice(0, 120)}. Rename it (letters, numbers, - and _ are safe) and export the package again.` });
+  const folder = req.body.folder ? String(req.body.folder) : scorm.newFolder();
+  if (!scorm.validFolder(folder)) return res.status(422).json({ error: 'Unknown package upload.' });
+  res.json({ folder, urls: await storage.signUploads('scorm', keys.map(k => `${folder}/${k}`)) });
+});
+// The SCORM package the browser unzipped into storage for this form, or null
+const scormUpload = body => (scorm.validFolder(body.scorm_pkg) && scorm.safeHome(body.scorm_home) ? { folder: body.scorm_pkg, home: body.scorm_home } : null);
 
 async function uniqueSlug(table, base, id = 0) {
   let slug = slugify(base) || 'item', n = 2;
@@ -128,25 +141,24 @@ router.get('/courses/:id/edit', adminOnly, async (req, res, next) => {
   if (!course) return next();
   res.render('admin/course-form', { title: `Edit course`, course, bodies: await bodyList() });
 });
-router.post('/courses/save', adminOnly, uploadScorm, csrf, async (req, res) => {
+router.post('/courses/save', adminOnly, async (req, res) => {
   const id = toId(req.body.id);
   const b = req.body;
-  const image = await storage.receive(b, 'course-image'), pkg = req.file;
+  const image = await storage.receive(b, 'course-image'), pkg = scormUpload(b);
   const fromScorm = !id && b.mode === 'scorm';
   const reject = async msg => {
-    await removeUpload('images', image && image.filename); await removeUpload('scorm', pkg && pkg.filename);
+    await removeUpload('images', image && image.filename); if (pkg) await scorm.remove(pkg.folder);
     flash(req, 'error', msg); return res.redirect(back(req, '/admin/courses'));
   };
-  if (pkg && !fromScorm) await removeUpload('scorm', pkg.filename);
-  // "Upload a SCORM package": unzip it first; the course title comes from the package unless one was typed
+  if (pkg && !fromScorm) await scorm.remove(pkg.folder);
+  // "Upload a SCORM package": read its manifest first; the course title comes from the package unless one was typed
   let installed = null;
   if (fromScorm) {
     if (!pkg) return reject('Choose the SCORM package (.zip) to upload.');
-    try { installed = scorm.install(pkg.path); } catch (err) {
-      await removeUpload('images', image && image.filename);
-      flash(req, 'error', `The course wasn’t added: ${err.message}`); return res.redirect(back(req, '/admin/courses'));
+    try { installed = await scorm.install(pkg.folder, pkg.home); } catch (err) {
+      return reject(`The course wasn’t added: ${err.message}`);
     }
-    if (!(b.title || '').trim()) b.title = installed.title || path.basename(pkg.originalname, path.extname(pkg.originalname));
+    if (!(b.title || '').trim()) b.title = installed.title || String(b.scorm_name || 'SCORM course').replace(/\.zip$/i, '');
   }
   if (!(b.title || '').trim()) return reject('Enter a course title.');
   const data = {
@@ -281,11 +293,7 @@ router.post('/modules/:id', async (req, res) => {
 const courseLearners = courseId => db.all(`SELECT u.id, u.name, u.email, e.status, e.batch_id FROM enrolments e JOIN users u ON u.id=e.user_id
   WHERE e.course_id=? AND e.status<>'cancelled' ORDER BY u.name`, courseId);
 const lessonCourse = lessonId => db.get('SELECT m.course_id FROM lessons l JOIN modules m ON m.id=l.module_id WHERE l.id=?', lessonId);
-// Deletes uploaded files from storage (SCORM zips, still received by this server, are on local disk)
-async function removeUpload(folder, ...files) {
-  if (folder !== 'scorm') return storage.remove(folder, ...files);
-  for (const file of files.filter(Boolean)) await fs.promises.unlink(path.join(__dirname, '..', 'uploads', 'scorm', path.basename(file))).catch(() => {});
-}
+const removeUpload = (folder, ...files) => storage.remove(folder, ...files);
 const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
 
 async function renderLessonForm(res, module, lesson) {
@@ -314,10 +322,10 @@ router.get('/lessons/:id/edit', async (req, res, next) => {
   if (!(await teaches(req, module.course_id))) return noAccess(res);
   await renderLessonForm(res, module, lesson);
 });
-router.post('/lessons/save', uploadScorm, csrf, async (req, res) => {
+router.post('/lessons/save', async (req, res) => {
   const [attachment, video] = await Promise.all([storage.receive(req.body, 'attachment'), storage.receive(req.body, 'video')]);
-  const pkg = req.file;
-  const discard = () => Promise.all([removeUpload('files', attachment && attachment.filename), removeUpload('videos', video && video.filename), removeUpload('scorm', pkg && pkg.filename)]);
+  const pkg = scormUpload(req.body);
+  const discard = () => Promise.all([removeUpload('files', attachment && attachment.filename), removeUpload('videos', video && video.filename), pkg && scorm.remove(pkg.folder)]);
   const id = toId(req.body.id);
   const module = await db.get('SELECT * FROM modules WHERE id=?', toId(req.body.module_id));
   const existing = id ? await db.get('SELECT * FROM lessons WHERE id=?', id) : null;
@@ -327,15 +335,15 @@ router.post('/lessons/save', uploadScorm, csrf, async (req, res) => {
 
   const b = req.body;
   const kind = b.kind === 'assignment' ? 'assignment' : 'lesson';
-  // Unzip the SCORM package first, so a bad package stops the save before anything changes
+  // Read the SCORM package's manifest first, so a bad package stops the save before anything changes
   let installed = null;
   if (pkg && kind === 'lesson') {
-    try { installed = scorm.install(pkg.path); } catch (err) {
-      await removeUpload('files', attachment && attachment.filename); await removeUpload('videos', video && video.filename);
+    try { installed = await scorm.install(pkg.folder, pkg.home); } catch (err) {
+      await discard();
       flash(req, 'error', `The SCORM package wasn’t added: ${err.message} Nothing was saved.`);
       return res.redirect(id ? `/admin/lessons/${id}/edit` : `/admin/modules/${module.id}/lessons/new`);
     }
-  } else if (pkg) await removeUpload('scorm', pkg.filename);
+  } else if (pkg) await scorm.remove(pkg.folder);
   if (installed && !(b.title || '').trim()) b.title = installed.title;
   const data = {
     title: (b.title || 'Untitled lesson').trim(), kind, content: b.content || '', video_url: (b.video_url || '').trim(),
@@ -405,16 +413,24 @@ router.post('/lessons/save', uploadScorm, csrf, async (req, res) => {
     const setFor = l => (data.assign_to === 'all' ? true : data.assign_to === 'batches' ? l.batch_id in batchDue : l.id in own);
     const targets = enrolled.filter(l => l.status === 'active' && setFor(l));
     const link = `${links.baseUrl(req)}/portal/courses/${course.slug}/lessons/${lessonId}`;
-    const results = await Promise.all(targets.map(l => {
+    const send = l => {
       const due = own[l.id] || batchDue[l.batch_id] || data.due_date;
-      return sendMail({
+      return mailer.sendMail({
         to: l.email, subject: `New assignment: ${data.title}`,
         text: `Hello ${l.name},\n\nA new assignment has been set for you on ${course.title}: ${data.title}.\n\n`
           + (due ? `Deadline: ${dueDate(due)}\n\n` : '') + `Open it here:\n${link}\n\n${process.env.SITE_NAME || 'Horizon College London'}`,
       });
-    }));
-    const sent = results.filter(Boolean).length;
-    note += targets.length ? ` Emailed ${sent} of ${targets.length} learner${targets.length === 1 ? '' : 's'}${sent < targets.length ? ' (check the SMTP settings)' : ''}.` : ' No active learners to email yet.';
+    };
+    // Sent after the page has responded, five at a time, so a big class or a slow mail server can't time the
+    // save out (on Vercel, waitUntil keeps the function running until they're done). Failures go to the log.
+    waitUntil((async () => {
+      let sent = 0;
+      for (let i = 0; i < targets.length; i += 5) sent += (await Promise.all(targets.slice(i, i + 5).map(send))).filter(Boolean).length;
+      if (sent < targets.length) console.error(`Assignment "${data.title}": emailed ${sent} of ${targets.length} learners.`);
+    })());
+    const n = `${targets.length} learner${targets.length === 1 ? '' : 's'}`;
+    if (!targets.length) note += ' No active learners to email yet.';
+    else note += mailer.enabled ? ` Emailing ${n} now.` : ` ${n} would be emailed, but email isn’t set up yet (see the SMTP settings).`;
   }
   flash(req, 'success', note);
   res.redirect(`/admin/courses/${module.course_id}/content`);

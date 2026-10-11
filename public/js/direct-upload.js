@@ -1,8 +1,18 @@
 // Uploads chosen files straight to storage before a form is sent, so big files never pass through the web server
 // (on Vercel a request can carry at most 4.5 MB).
 // A form opts in with data-direct-upload="<url that signs uploads>"; each <input type="file" data-upload="<purpose>">
-// is uploaded first and then sent as hidden <purpose>_path and <purpose>_name fields.
+// is uploaded first and then sent as hidden <purpose>_path and <purpose>_name fields. A SCORM package
+// (data-upload="scorm") is unzipped and uploaded file by file instead, by scorm-upload.js.
 (function () {
+  const shown = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+  const loadScript = src => new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="' + src + '"]')) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve;
+    s.onerror = () => reject(new Error('Part of the page couldn’t be loaded. Refresh and try again.'));
+    document.head.appendChild(s);
+  });
+
   function post(url, form, fields) {
     const body = new URLSearchParams(Object.assign({ _csrf: form.querySelector('input[name=_csrf]').value }, fields));
     return fetch(url, { method: 'POST', body, credentials: 'same-origin', headers: { Accept: 'application/json' } })
@@ -33,7 +43,8 @@
   document.addEventListener('submit', async e => {
     const form = e.target;
     if (e.defaultPrevented || !form.matches('form[data-direct-upload]') || form.dataset.uploaded) return;
-    const inputs = Array.from(form.querySelectorAll('input[type=file][data-upload]')).filter(i => !i.disabled && i.files.length);
+    // Inputs in a hidden part of the form (e.g. the SCORM box when adding a course by hand) are left out
+    const inputs = Array.from(form.querySelectorAll('input[type=file][data-upload]')).filter(i => !i.disabled && i.files.length && shown(i));
     if (!inputs.length) return;
     e.preventDefault();
     const submitter = e.submitter;
@@ -45,6 +56,19 @@
     try {
       for (const input of inputs) {
         const file = input.files[0], purpose = input.dataset.upload;
+        if (purpose === 'scorm') {
+          await loadScript('/js/scorm-upload.js?v=1');
+          const pkg = await window.HorizonScorm.upload(file, {
+            signUrl: input.dataset.signUrl, csrf: form.querySelector('input[name=_csrf]').value,
+            maxZipMB: Number(input.dataset.maxMb), maxFileMB: Number(input.dataset.fileMaxMb),
+            onStatus: text => { note.textContent = text; },
+          });
+          hidden(form, 'scorm_pkg', pkg.folder);
+          hidden(form, 'scorm_home', pkg.home);
+          hidden(form, 'scorm_name', file.name);
+          input.disabled = true;
+          continue;
+        }
         note.textContent = 'Uploading ' + file.name + '…';
         const sign = await post(form.dataset.directUpload, form, { purpose, filename: file.name, size: file.size });
         if (sign.error) throw new Error(sign.error);
