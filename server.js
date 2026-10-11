@@ -2,7 +2,7 @@ require('dotenv').config({ quiet: true });
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-const SqliteStore = require('./session-store');
+const DbSessionStore = require('./session-store');
 const { locals, csrf } = require('./middleware');
 
 const app = express();
@@ -19,7 +19,7 @@ app.use('/uploads/videos', express.static(path.join(__dirname, 'uploads', 'video
 
 app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use(session({
-  store: new SqliteStore(),
+  store: new DbSessionStore(),
   secret: process.env.SESSION_SECRET || 'dev-only-secret-change-me',
   resave: false,
   saveUninitialized: false,

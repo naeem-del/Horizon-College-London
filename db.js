@@ -110,4 +110,11 @@ function slugify(s) {
   return String(s).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-module.exports = { db, slugify };
+// An id from a URL or form as a number, or 0 when it isn't a valid id (Postgres rejects text or out-of-range
+// values for integer columns, where SQLite simply found no row)
+function toId(v) {
+  const n = Number(v);
+  return /^\d+$/.test(String(v ?? '').trim()) && n > 0 && n <= 2147483647 ? n : 0;
+}
+
+module.exports = { db, slugify, toId };

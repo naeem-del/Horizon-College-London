@@ -7,24 +7,26 @@ const hash = t => crypto.createHash('sha256').update(t).digest('hex');
 const HOUR = 60 * 60 * 1000;
 
 // Issues a fresh link and cancels any earlier ones for the same account
-function createToken(userId, hours) {
+async function createToken(userId, hours) {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('DELETE FROM password_tokens WHERE user_id=?').run(userId);
-  db.prepare('INSERT INTO password_tokens (token_hash,user_id,expires_at,created_at) VALUES (?,?,?,?)')
-    .run(hash(token), userId, Date.now() + hours * HOUR, Date.now());
+  await db.tx(async t => {
+    await t.run('DELETE FROM password_tokens WHERE user_id=?', userId);
+    await t.run('INSERT INTO password_tokens (token_hash,user_id,expires_at,created_at) VALUES (?,?,?,?)',
+      hash(token), userId, Date.now() + hours * HOUR, Date.now());
+  });
   return token;
 }
 
-function findUser(token) {
-  const row = db.prepare('SELECT user_id, expires_at FROM password_tokens WHERE token_hash=?').get(hash(String(token || '')));
+async function findUser(token) {
+  const row = await db.get('SELECT user_id, expires_at FROM password_tokens WHERE token_hash=?', hash(String(token || '')));
   if (!row || row.expires_at < Date.now()) return null;
-  return db.prepare('SELECT * FROM users WHERE id=?').get(row.user_id) || null;
+  return (await db.get('SELECT * FROM users WHERE id=?', row.user_id)) || null;
 }
 
-function useUp(userId) { db.prepare('DELETE FROM password_tokens WHERE user_id=?').run(userId); }
+async function useUp(userId) { await db.run('DELETE FROM password_tokens WHERE user_id=?', userId); }
 
-function recentlySent(userId, minutes) {
-  return !!db.prepare('SELECT 1 FROM password_tokens WHERE user_id=? AND created_at>?').get(userId, Date.now() - minutes * 60 * 1000);
+async function recentlySent(userId, minutes) {
+  return !!(await db.get('SELECT 1 FROM password_tokens WHERE user_id=? AND created_at>?', userId, Date.now() - minutes * 60 * 1000));
 }
 
 const baseUrl = req => (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
@@ -33,7 +35,7 @@ const roleName = r => ({ admin: 'administrator', tutor: 'tutor / assessor', stud
 
 // Returns { sent, link } so the caller can show the link if email isn't configured
 async function sendInvite(req, user) {
-  const link = `${baseUrl(req)}/set-password/${createToken(user.id, 24 * 7)}`;
+  const link = `${baseUrl(req)}/set-password/${await createToken(user.id, 24 * 7)}`;
   const sent = await sendMail({
     to: user.email,
     subject: `Your ${site()} account`,
@@ -46,7 +48,7 @@ async function sendInvite(req, user) {
 }
 
 async function sendReset(req, user) {
-  const link = `${baseUrl(req)}/set-password/${createToken(user.id, 1)}`;
+  const link = `${baseUrl(req)}/set-password/${await createToken(user.id, 1)}`;
   const sent = await sendMail({
     to: user.email,
     subject: `Reset your ${site()} password`,

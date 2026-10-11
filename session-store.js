@@ -1,36 +1,25 @@
-// Stores login sessions in the same SQLite database, so users stay logged in after a restart
+// Stores login sessions in the database, so users stay logged in across restarts and server instances.
+// Expired rows are cleared by the 'horizon-cleanup' job in supabase/migrations/0002_cleanup_jobs.sql.
 const session = require('express-session');
 const { db } = require('./db');
 
-db.exec(`CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expires INTEGER NOT NULL)`);
-
-class SqliteStore extends session.Store {
-  constructor() {
-    super();
-    setInterval(() => db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now()), 15 * 60 * 1000).unref();
-  }
+class DbSessionStore extends session.Store {
   expiry(sess) {
     return sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 86400000;
   }
   get(sid, cb) {
-    try {
-      const row = db.prepare('SELECT sess, expires FROM sessions WHERE sid=?').get(sid);
-      if (!row || row.expires < Date.now()) return cb(null, null);
-      cb(null, JSON.parse(row.sess));
-    } catch (e) { cb(e); }
+    db.get('SELECT sess, expires FROM sessions WHERE sid=?', sid)
+      .then(row => cb(null, !row || row.expires < Date.now() ? null : JSON.parse(row.sess)), cb);
   }
   set(sid, sess, cb = () => {}) {
-    try {
-      db.prepare('INSERT INTO sessions (sid,sess,expires) VALUES (?,?,?) ON CONFLICT(sid) DO UPDATE SET sess=excluded.sess, expires=excluded.expires')
-        .run(sid, JSON.stringify(sess), this.expiry(sess));
-      cb(null);
-    } catch (e) { cb(e); }
+    db.run('INSERT INTO sessions (sid,sess,expires) VALUES (?,?,?) ON CONFLICT(sid) DO UPDATE SET sess=excluded.sess, expires=excluded.expires',
+      sid, JSON.stringify(sess), this.expiry(sess)).then(() => cb(null), cb);
   }
   destroy(sid, cb = () => {}) {
-    try { db.prepare('DELETE FROM sessions WHERE sid=?').run(sid); cb(null); } catch (e) { cb(e); }
+    db.run('DELETE FROM sessions WHERE sid=?', sid).then(() => cb(null), cb);
   }
   touch(sid, sess, cb = () => {}) {
-    try { db.prepare('UPDATE sessions SET expires=? WHERE sid=?').run(this.expiry(sess), sid); cb(null); } catch (e) { cb(e); }
+    db.run('UPDATE sessions SET expires=? WHERE sid=?', this.expiry(sess), sid).then(() => cb(null), cb);
   }
 }
-module.exports = SqliteStore;
+module.exports = DbSessionStore;

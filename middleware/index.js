@@ -4,10 +4,10 @@ const path = require('path');
 const { db } = require('../db');
 
 // Attach the logged-in user, flash messages and CSRF token to every view
-function locals(req, res, next) {
+async function locals(req, res, next) {
   res.locals.user = null;
   if (req.session.userId) {
-    res.locals.user = db.prepare('SELECT id,name,email,role,photo FROM users WHERE id=?').get(req.session.userId) || null;
+    res.locals.user = (await db.get('SELECT id,name,email,role,photo FROM users WHERE id=?', req.session.userId)) || null;
     if (!res.locals.user) delete req.session.userId;
   }
   req.user = res.locals.user;

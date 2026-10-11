@@ -167,9 +167,9 @@ function install(zipFile) {
 
 // Deletes a package's files once no lesson uses them any more (one package can feed several lessons).
 // Call it after the lessons have been changed or deleted.
-function remove(folder) {
+async function remove(folder) {
   if (!folder || path.basename(folder) !== folder) return;
-  if (require('./db').db.prepare('SELECT 1 FROM lessons WHERE scorm_folder=? LIMIT 1').get(folder)) return;
+  if (await require('./db').db.get('SELECT 1 FROM lessons WHERE scorm_folder=? LIMIT 1', folder)) return;
   fs.rm(path.join(ROOT, folder), { recursive: true, force: true }, () => {});
 }
 

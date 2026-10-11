@@ -24,14 +24,16 @@ const strip = html => String(html || '')
     for (const it of items) {
       const title = strip(it.title && it.title.rendered);
       const slug = slugify(it.slug || title);
-      if (db.prepare('SELECT 1 FROM courses WHERE slug=?').get(slug)) { skipped++; continue; }
+      if (await db.get('SELECT 1 FROM courses WHERE slug=?', slug)) { skipped++; continue; }
       const description = strip(it.content && it.content.rendered);
       const summary = strip(it.excerpt && it.excerpt.rendered).slice(0, 220);
-      db.prepare('INSERT INTO courses (title,slug,summary,description,published) VALUES (?,?,?,?,0)').run(title, slug, summary, description);
+      await db.run('INSERT INTO courses (title,slug,summary,description,published) VALUES (?,?,?,?,0)', title, slug, summary, description);
       added++;
     }
     if (items.length < 50) break;
     page++;
   }
   console.log(`Imported ${added} course(s) as drafts, skipped ${skipped} that already exist. Review them at /admin/courses.`);
-})();
+})()
+  .catch(err => { console.error(err.message); process.exitCode = 1; })
+  .finally(() => db.pool.end());
