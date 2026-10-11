@@ -10,6 +10,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 Object.assign(app.locals, require('./helpers'));
+app.locals.siteName = process.env.SITE_NAME || 'Horizon College London';
 // Upload size limit in MB for a form field, for help text such as "up to 50 MB"
 const { UPLOADS, FILE_LIMIT_MB } = require('./storage');
 app.locals.uploadMB = purpose => Math.round(UPLOADS[purpose].max / (1024 * 1024));
@@ -46,9 +47,19 @@ app.use('/', require('./routes/auth'));
 app.use('/portal', require('./routes/portal'));
 app.use('/admin', require('./routes/admin'));
 
-app.use((req, res) => res.status(404).render('public/error', { title: 'Page not found', message: 'We couldn’t find that page. It may have moved — try the course list.' }));
+// The page layout needs these; set safe defaults in case the request failed before `locals` ran
+// (for example when the database can't be reached while loading the session)
+function pageDefaults(req, res) {
+  for (const [key, value] of Object.entries({ user: null, flash: null, csrf: '', path: req.path })) {
+    if (res.locals[key] === undefined) res.locals[key] = value;
+  }
+}
+app.use((req, res) => { pageDefaults(req, res); res.status(404).render('public/error', { title: 'Page not found', message: 'We couldn’t find that page. It may have moved — try the course list.' }); });
 app.use((err, req, res, next) => {
   console.error(err);
+  // The page already went out (e.g. saving the session failed afterwards): sending another would crash the server
+  if (res.headersSent) return;
+  pageDefaults(req, res);
   res.status(500).render('public/error', { title: 'Something went wrong', message: 'The server hit an error. Please try again in a moment.' });
 });
 

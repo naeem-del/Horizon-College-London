@@ -15,6 +15,9 @@ types.setTypeParser(1700, Number);
 const parseTimestamp = types.getTypeParser(1184);
 types.setTypeParser(1184, v => parseTimestamp(v).toISOString());
 
+// Without this the driver quietly tries a database on this machine (and fails with "ECONNREFUSED 127.0.0.1:5432")
+if (!process.env.DATABASE_URL) console.error('DATABASE_URL is not set: add the Supabase transaction pooler connection string to .env (or, on Vercel, to the project’s Environment Variables).');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },

@@ -14,7 +14,6 @@ async function locals(req, res, next) {
   res.locals.flash = req.session.flash || null;
   delete req.session.flash;
   res.locals.path = req.path;
-  res.locals.siteName = process.env.SITE_NAME || 'Horizon College London';
   next();
 }
 
