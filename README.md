@@ -3,8 +3,8 @@
 A complete Node.js replacement for the WordPress site: public website, course catalogue with awarding bodies,
 enrolment form, student portal (lessons, progress, evidence uploads, assessor feedback) and an admin area.
 
-Built with Express and EJS templates. Data lives in Supabase (Postgres database and file storage), and the site
-is deployed on Vercel.
+Built with Express and EJS templates. Data lives in Supabase (Postgres database and file storage); the app runs on
+a VPS behind Nginx (see section 5).
 
 ## 1. Run it on your computer
 
@@ -70,7 +70,8 @@ private evidence files (only the learner and staff can download), upload type/si
 
 ```
 server.js              app setup (exports the app; listens on a port only when run directly)
-api/index.js           Vercel entry point; vercel.json routes every non-static request to it
+deploy/                Nginx config for running on a VPS
+api/index.js           Vercel entry point (only used if deploying to Vercel instead)
 db.js                  Postgres connection and query helpers (db.get / db.all / db.run / db.tx)
 supabase/migrations/   the database tables; add a new numbered .sql file to change them, then npm run migrate
 storage.js             Supabase Storage: upload rules, signed upload and download links
@@ -81,7 +82,7 @@ routes/portal.js       student portal / LMS
 routes/admin.js        admin area
 routes/scorm-content.js  serves SCORM package files to lessons from our own domain
 views/                 page templates (EJS = HTML with <%= %> tags)
-public/                CSS, images and browser scripts (served by Vercel's CDN)
+public/                CSS, images and browser scripts
 public/js/direct-upload.js   uploads files straight from the browser to storage
 public/js/scorm-upload.js    unzips SCORM packages in the browser and uploads their files
 scripts/               migrate, seed, setup-storage, import-wordpress
@@ -104,37 +105,108 @@ this project replaces them. Your *content* comes across:
    (they get an email link to choose a password) or ask them to register with the same email.
 4. **Keep the WordPress site live** until the new one is tested, then point the domain at the new server.
 
-## 5. Putting it live (Vercel + Supabase)
+## 5. Putting it live (VPS + Supabase)
+
+The app runs on a VPS (any Ubuntu 24.04 server; 1 vCPU and 1–2 GB of RAM is plenty). The database and all uploaded
+files stay in Supabase, so the server holds no data and can be rebuilt at any time. Choose a VPS in Europe
+(London, Dublin or Frankfurt): every page makes several database queries, so being close to Supabase (Ireland) matters.
 
 Use a **separate Supabase project for the live site**, set up as in section 1 (`npm run migrate`, `npm run seed`,
 `npm run setup-storage` with that project's values in `.env`).
 
-1. Push the project to GitHub and import it in Vercel (Add New → Project). Framework preset: **Other**.
-   Leave the Build Command and Output Directory overrides **off**: `vercel.json` sets everything, including the
-   Dublin region (`dub1`, next to a Supabase project in eu-west-1; change it if your project is elsewhere).
-2. Add the environment variables (Project → Settings → Environment Variables): `DATABASE_URL`, `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, `SITE_URL` (the live address, no trailing slash), `SITE_NAME`,
-   `NOTIFY_EMAIL` and the `SMTP_*` / `MAIL_FROM` settings. Mark the secrets as sensitive. Don't set `PORT` or
-   `NODE_ENV`; Vercel sets them.
-3. Deploy, then point your domain at Vercel (Project → Settings → Domains). HTTPS is automatic.
+**1. Prepare the server** (as root, or with sudo):
 
-Plans: Vercel's free Hobby plan is for non-commercial use, so a college site needs **Vercel Pro**. Supabase Free
-limits each file to 50 MB, pauses projects after a week without activity and has no point-in-time restore, so a live
-LMS should be on **Supabase Pro** (then raise `MAX_VIDEO_MB` / `MAX_FILE_MB` and run `npm run setup-storage` again).
+```bash
+apt update && apt upgrade -y
+apt install -y nginx git unattended-upgrades          # unattended-upgrades installs security fixes automatically
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
+npm install -g pm2
+ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable   # only SSH, HTTP and HTTPS are reachable
+```
 
-**Email**: fill in the SMTP settings (Hostinger: `smtp.hostinger.com`, port 465). Without them, emails are written to
-the log instead of sent, and the admin area shows set-password links for you to pass on.
+**2. Get the code and settings**:
 
-**Backups**: Supabase Pro backs up the database daily. Files in Storage are **not** part of those backups: copy the
-`media` and `private` buckets regularly (for example with the Supabase CLI), or keep your own copy of course materials.
+```bash
+git clone https://github.com/naeem-del/Horizon-College-London.git /var/www/horizon
+cd /var/www/horizon
+npm ci --omit=dev
+cp .env.example .env && nano .env
+```
+
+In `.env` set `NODE_ENV=production` (secure login cookies; needs HTTPS, step 4), `PORT=3000`, `DB_POOL_MAX=10`,
+`SITE_URL=https://horizoncollegelondon.com` and the Supabase, `SESSION_SECRET` and Resend values. Protect it with
+`chmod 600 .env`.
+
+**3. Start the app and keep it running** (PM2 restarts it after a crash or a reboot):
+
+```bash
+pm2 start npm --name horizon -- start
+pm2 save && pm2 startup                 # run the command it prints, so the app starts on boot
+pm2 install pm2-logrotate               # keeps the log files from filling the disk
+```
+
+**4. Nginx and HTTPS**: first point the domain at the server (below), then:
+
+```bash
+cp deploy/nginx-horizon.conf /etc/nginx/sites-available/horizon
+ln -s /etc/nginx/sites-available/horizon /etc/nginx/sites-enabled/horizon && rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+apt install -y certbot python3-certbot-nginx
+certbot --nginx -d horizoncollegelondon.com -d www.horizoncollegelondon.com   # free certificate, renews itself
+```
+
+**Pointing the domain**: the domain is registered at GoDaddy but its DNS is managed at **Hostinger** (hPanel → Domains
+→ DNS Zone). There, change the `A` record for `@` to the VPS's IP address and make `www` an `A` record to the same IP
+(replacing the current `CNAME` to Hostinger's CDN). Leave the Google Workspace `MX`, SPF and verification records
+and the Resend records alone, and don't change the nameservers.
+
+**Updating** after changes are pushed to GitHub:
+
+```bash
+cd /var/www/horizon && git pull && npm ci --omit=dev
+npm run migrate                         # only if there are new files in supabase/migrations
+pm2 reload horizon
+```
+
+**Logs**: `pm2 logs horizon` (add `--lines 200` for more). **Status**: `pm2 status`.
+
+Plans: a live LMS should be on **Supabase Pro** (daily backups, files over 50 MB, no pausing after a quiet week); then
+raise `MAX_VIDEO_MB` / `MAX_FILE_MB` and run `npm run setup-storage` again.
+
+The project also still deploys to Vercel if ever needed (`api/index.js` and `vercel.json`): import the repository
+with the Framework preset **Other**, add the same environment variables except `PORT`, `NODE_ENV` and `DB_POOL_MAX`,
+and use Vercel Pro (the free Hobby plan is non-commercial only).
+
+**Email** is sent through Resend (resend.com). In Resend, add the domain `horizoncollegelondon.com` (region Ireland)
+and copy the DNS records it lists into the domain's DNS zone, which is at **Hostinger** (the domain is registered at
+GoDaddy but uses Hostinger's nameservers). Resend's records sit on a `send.` subdomain and a `resend._domainkey`
+key, so they don't affect the Google Workspace mailboxes: leave the existing `MX` and SPF records as they are. Then
+create an API key and set `RESEND_API_KEY`. Without it, emails are written to the log instead of sent, and the
+admin area shows set-password links for you to pass on. A DMARC record (`_dmarc` TXT:
+`v=DMARC1; p=none; rua=mailto:info@horizoncollegelondon.com`) helps both Google and Resend mail reach inboxes.
+
+**Backups**: Supabase Pro backs up the database daily, but files in Storage are **not** part of those backups.
+`npm run backup-storage -- <folder>` copies both buckets into a folder, fetching only new or changed files on later
+runs (deleted files are kept). Copy that folder off the server as well (to another machine or cloud storage).
 
 **Housekeeping**: expired sessions, password links and login-attempt counters are cleared every 15 minutes by a
-database job (`supabase/migrations/0002_cleanup_jobs.sql`).
+database job (`supabase/migrations/0002_cleanup_jobs.sql`). Files uploaded from forms that were never saved stay in
+Storage until `npm run cleanup-uploads` removes them: it lists unused files older than 24 hours, and deletes them
+only with `-- --delete`.
+
+Run both every night on the VPS (`crontab -e` as the user that runs the app). The backup runs first, so anything
+the clean-up removes has already been copied:
+
+```
+30 2 * * * cd /var/www/horizon && npm run -s backup-storage -- /var/backups/horizon-storage >> $HOME/horizon-backup.log 2>&1
+0 3 * * * cd /var/www/horizon && npm run -s cleanup-uploads -- --delete >> $HOME/horizon-cleanup.log 2>&1
+```
+
+(Create the backup folder first: `sudo mkdir -p /var/backups/horizon-storage && sudo chown $USER /var/backups/horizon-storage`.)
 
 ## 6. Good next steps
 
 - Online payments (Stripe Checkout) on the enrolment form, if you take fees online
-- Password-reset emails
 - Certificates (PDF) when a course is completed
 - Quizzes / knowledge checks as a third lesson type
 - Rich text editor for lesson content (e.g. Quill) instead of plain paragraphs

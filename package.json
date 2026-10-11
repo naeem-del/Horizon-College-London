@@ -8,7 +8,9 @@
     "dev": "node --watch server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "setup-storage": "node scripts/setup-storage.js"
+    "setup-storage": "node scripts/setup-storage.js",
+    "backup-storage": "node scripts/backup-storage.js",
+    "cleanup-uploads": "node scripts/cleanup-uploads.js"
   },
   "author": "",
   "license": "ISC",
@@ -20,8 +22,8 @@
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "nodemailer": "^10.0.13",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "resend": "^6.32.1"
   },
   "engines": {
     "node": "22.x"

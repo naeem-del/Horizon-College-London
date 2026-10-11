@@ -120,21 +120,29 @@ async function signedKeyUrl(folder, key, seconds) {
   return error ? null : data.signedUrl;
 }
 
-// Deletes everything under folder/prefix (Storage has no folders as such, so list them recursively first)
-async function removeTree(folder, prefix) {
-  const bucket = bucketOf(folder), keys = [];
+// Every file under a path in a bucket, as [{ key, size, created }] (Storage has no real folders, so walk the listing)
+async function listTree(bucketName, prefix) {
+  const bucket = sb.storage.from(bucketName), files = [];
   async function walk(dir) {
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await bucket.list(dir, { limit: 1000, offset });
       if (error) throw new Error(`Storage listing failed: ${error.message}`);
       for (const item of data) {
-        if (item.id === null) await walk(`${dir}/${item.name}`); // a sub-folder
-        else keys.push(`${dir}/${item.name}`);
+        const key = dir ? `${dir}/${item.name}` : item.name;
+        if (item.id === null) await walk(key); // a sub-folder
+        else if (item.name !== '.emptyFolderPlaceholder') files.push({ key, size: (item.metadata && item.metadata.size) || 0, created: item.created_at });
       }
       if (data.length < 1000) break;
     }
   }
-  await walk(`${folder}/${prefix}`);
+  await walk(prefix);
+  return files;
+}
+
+// Deletes everything under folder/prefix
+async function removeTree(folder, prefix) {
+  const bucket = bucketOf(folder);
+  const keys = (await listTree(BUCKET[folder], `${folder}/${prefix}`)).map(f => f.key);
   for (let i = 0; i < keys.length; i += 1000) {
     const { error } = await bucket.remove(keys.slice(i, i + 1000));
     if (error) console.error(`Couldn't delete files under ${folder}/${prefix}: ${error.message}`);
@@ -144,5 +152,5 @@ async function removeTree(folder, prefix) {
 
 module.exports = {
   UPLOADS, BUCKET, FILE_LIMIT_MB, refuse, signUpload, receive, remove, signedUrl, sizeOf,
-  signUploads, readText, exists, signedKeyUrl, removeTree, client: sb,
+  signUploads, readText, exists, signedKeyUrl, listTree, removeTree, client: sb,
 };

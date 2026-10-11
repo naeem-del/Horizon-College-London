@@ -8,3 +8,4 @@ uploads/videos/*
 uploads/policies/*
 uploads/scorm/*
 !uploads/**/.gitkeep
+backups/

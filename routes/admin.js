@@ -413,24 +413,22 @@ router.post('/lessons/save', async (req, res) => {
     const setFor = l => (data.assign_to === 'all' ? true : data.assign_to === 'batches' ? l.batch_id in batchDue : l.id in own);
     const targets = enrolled.filter(l => l.status === 'active' && setFor(l));
     const link = `${links.baseUrl(req)}/portal/courses/${course.slug}/lessons/${lessonId}`;
-    const send = l => {
+    const emails = targets.map(l => {
       const due = own[l.id] || batchDue[l.batch_id] || data.due_date;
-      return mailer.sendMail({
+      return {
         to: l.email, subject: `New assignment: ${data.title}`,
         text: `Hello ${l.name},\n\nA new assignment has been set for you on ${course.title}: ${data.title}.\n\n`
           + (due ? `Deadline: ${dueDate(due)}\n\n` : '') + `Open it here:\n${link}\n\n${process.env.SITE_NAME || 'Horizon College London'}`,
-      });
-    };
-    // Sent after the page has responded, five at a time, so a big class or a slow mail server can't time the
-    // save out (on Vercel, waitUntil keeps the function running until they're done). Failures go to the log.
-    waitUntil((async () => {
-      let sent = 0;
-      for (let i = 0; i < targets.length; i += 5) sent += (await Promise.all(targets.slice(i, i + 5).map(send))).filter(Boolean).length;
-      if (sent < targets.length) console.error(`Assignment "${data.title}": emailed ${sent} of ${targets.length} learners.`);
-    })());
+      };
+    });
+    // Sent after the page has responded (up to 100 per request to Resend), so a big class can't time the save out.
+    // On Vercel, waitUntil keeps the function running until they're done. Failures go to the log.
+    waitUntil(mailer.sendMany(emails).then(sent => {
+      if (mailer.enabled && sent < emails.length) console.error(`Assignment "${data.title}": emailed ${sent} of ${emails.length} learners.`);
+    }));
     const n = `${targets.length} learner${targets.length === 1 ? '' : 's'}`;
     if (!targets.length) note += ' No active learners to email yet.';
-    else note += mailer.enabled ? ` Emailing ${n} now.` : ` ${n} would be emailed, but email isn’t set up yet (see the SMTP settings).`;
+    else note += mailer.enabled ? ` Emailing ${n} now.` : ` ${n} would be emailed, but email isn’t set up yet (RESEND_API_KEY isn’t set).`;
   }
   flash(req, 'success', note);
   res.redirect(`/admin/courses/${module.course_id}/content`);
@@ -652,7 +650,7 @@ router.post('/students', adminOnly, async (req, res) => {
   const invite = await links.sendInvite(req, user);
   flash(req, invite.sent ? 'success' : 'error', invite.sent
     ? `Account created. An email has been sent to ${email} with a link to set their password.`
-    : `Account created, but the email couldn’t be sent (check the SMTP settings). Send them this link to set their password, valid for 7 days: ${invite.link}`);
+    : `Account created, but the email couldn’t be sent (check the Resend settings and logs). Send them this link to set their password, valid for 7 days: ${invite.link}`);
   res.redirect(`/admin/students/${user.id}`);
 });
 router.get('/students/:id', async (req, res, next) => {
@@ -699,7 +697,7 @@ router.post('/students/:id/invite', adminOnly, async (req, res, next) => {
   const invite = await links.sendInvite(req, u);
   flash(req, invite.sent ? 'success' : 'error', invite.sent
     ? `A new set-password link has been emailed to ${u.email}. Any earlier link no longer works.`
-    : `The email couldn’t be sent (check the SMTP settings). Send them this link instead, valid for 7 days: ${invite.link}`);
+    : `The email couldn’t be sent (check the Resend settings and logs). Send them this link instead, valid for 7 days: ${invite.link}`);
   res.redirect(`/admin/students/${u.id}`);
 });
 router.post('/students/:id/enrol', adminOnly, async (req, res) => {
