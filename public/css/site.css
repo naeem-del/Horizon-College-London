@@ -37,7 +37,9 @@ p { margin: 0 0 1em; }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; gap: .5em; padding: .78em 1.4em; border-radius: 999px; border: 2px solid transparent;
-  font: 600 .95rem/1 var(--sans); text-decoration: none; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+  font: 600 .95rem/1 var(--sans); text-decoration: none; cursor: pointer; transition: background .15s, color .15s, border-color .15s, transform .15s, box-shadow .15s; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(20,33,61,.15); }
+.btn:active { transform: translateY(0); box-shadow: none; }
 .btn-gold { background: var(--gold); color: var(--navy); }
 .btn-gold:hover { background: var(--gold-deep); color: var(--white); }
 .btn-navy { background: var(--navy); color: var(--white); }
@@ -265,7 +267,28 @@ textarea { min-height: 130px; resize: vertical; }
 @media (max-width: 900px) { .detail { grid-template-columns: 1fr; } .aside-card { position: static; } }
 
 /* Footer */
-.site-footer { background: var(--navy); color: #AEB9D3; padding: 64px 0 28px; margin-top: 0; }
+.site-footer { position: relative; overflow: hidden; background: var(--navy); color: #AEB9D3; padding: 64px 0 28px; margin-top: 0; }
+.site-footer > .wrap { position: relative; z-index: 1; }
+/* Gold rings, angled stripes and a chevron behind the footer content */
+.footer-deco { position: absolute; inset: 0; pointer-events: none; }
+.footer-deco span { position: absolute; display: block; }
+.deco-ring { right: -150px; bottom: -230px; width: 480px; height: 480px; border-radius: 50%; border: 2px solid var(--gold); opacity: .35; }
+.deco-ring::after { content: ""; position: absolute; inset: 46px; border-radius: 50%; border: 1px solid var(--gold); opacity: .6; }
+.deco-ring-sm { right: auto; bottom: auto; left: -70px; top: -70px; width: 190px; height: 190px; opacity: .22; }
+.deco-ring-sm::after { inset: 30px; }
+.deco-lines { top: 0; right: 24%; width: 230px; height: 130px; opacity: .16;
+  background: repeating-linear-gradient(-45deg, var(--gold) 0 2px, transparent 2px 16px); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.deco-angle { left: 36%; bottom: 120px; width: 46px; height: 46px; border-top: 2px solid var(--gold); border-right: 2px solid var(--gold); transform: rotate(45deg); opacity: .4; }
+.deco-dot { right: 21%; top: 46%; width: 12px; height: 12px; border-radius: 50%; background: var(--gold); opacity: .75; box-shadow: 0 0 0 6px rgba(242,169,59,.15); }
+@media (max-width: 800px) {
+  .deco-ring:not(.deco-ring-sm) { width: 300px; height: 300px; right: -120px; bottom: -140px; }
+  .deco-ring:not(.deco-ring-sm)::after { inset: 30px; }
+  .deco-ring-sm { width: 130px; height: 130px; left: -50px; top: -50px; }
+  .deco-ring-sm::after { inset: 22px; }
+  .deco-lines { right: 0; width: 160px; height: 90px; }
+  .deco-angle { left: auto; right: 28px; bottom: auto; top: 46%; }
+  .deco-dot { right: 40%; top: auto; bottom: 120px; }
+}
 .site-footer .cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr max-content; gap: 32px; } /* Contact column fits the email address */
 .site-footer h4 { color: #fff; font-family: var(--sans); font-size: .95rem; margin: 0 0 12px; }
 /* Footer logo: on a white tile so the dark crest shows on navy, with the name underneath */
@@ -369,3 +392,42 @@ textarea { min-height: 130px; resize: vertical; }
 /* Direct uploads (public/js/direct-upload.js) */
 .upload-note { margin: 10px 0 0; color: var(--slate); }
 .upload-note.upload-error { color: var(--rose); font-weight: 600; }
+
+/* ---------- Motion (public/js/animations.js) ----------
+   Hover effects work everywhere. Entrance effects only run under <html class="anim">, which head.ejs sets on public
+   pages when the visitor hasn't asked for reduced motion. They use `translate`, so hover `transform`s still work. */
+.course-card { transition: transform .25s ease, box-shadow .25s ease, border-color .2s ease; }
+.course-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(20,33,61,.14); }
+.course-top img { transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+.course-card:hover .course-top img { transform: scale(1.06); }
+.course-top .arc { transition: bottom .5s cubic-bezier(.2,.7,.2,1); }
+.course-card:hover .course-top .arc { bottom: -70%; }
+.pillar { transition: transform .25s ease, box-shadow .25s ease; }
+.pillar:hover { transform: translateY(-6px); box-shadow: 0 20px 44px rgba(20,33,61,.12); }
+.about-card { transition: border-color .2s ease, box-shadow .25s ease, transform .25s ease; }
+.about-card:hover { border-color: var(--gold); box-shadow: 0 12px 30px rgba(20,33,61,.08); transform: translateY(-3px); }
+.steps li::before { transition: background .25s ease, color .25s ease, transform .25s ease; }
+.steps li:hover::before { background: var(--gold); color: var(--navy); transform: scale(1.08); }
+
+/* Hero: the words rise in one after another, then the facts card pops up */
+@keyframes enter-up { from { opacity: 0; translate: 0 26px; } to { opacity: 1; translate: 0 0; } }
+@keyframes pop-in { from { opacity: 0; scale: .9; translate: 0 12px; } to { opacity: 1; scale: 1; translate: 0 0; } }
+.anim .hero-copy > * { animation: enter-up .8s cubic-bezier(.2,.7,.2,1) both; }
+.anim .hero-copy > :nth-child(2) { animation-delay: .12s; }
+.anim .hero-copy > :nth-child(3) { animation-delay: .24s; }
+.anim .hero-copy > :nth-child(4) { animation-delay: .36s; }
+.anim .horizon-facts { animation: pop-in .6s .9s cubic-bezier(.2,.9,.3,1.2) both; }
+
+/* Sections and cards fade up as they scroll into view (keep this list in step with animations.js) */
+.anim :is(.pillar, .section-head, .course-card, .about-photo, .about-copy > *, .why > div, .steps li, .cta-band, .bodies-band h2, .filters):not(.is-in) { opacity: 0; translate: 0 28px; }
+.anim :is(.pillar, .section-head, .course-card, .about-photo, .about-copy > *, .why > div, .steps li, .cta-band, .bodies-band h2, .filters) {
+  transition: opacity .7s cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms), translate .7s cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms),
+    transform .25s ease, box-shadow .25s ease, border-color .2s ease; }
+/* The line between enrolment steps draws itself in */
+.anim .steps li::after { transform: scaleX(0); transform-origin: left; transition: transform .7s cubic-bezier(.2,.7,.2,1) calc(var(--reveal-delay, 0ms) + .35s); }
+.anim .steps li.is-in::after { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .course-card, .course-top img, .course-top .arc, .pillar, .about-card, .steps li::before { transition: none; }
+  .btn:hover, .course-card:hover, .pillar:hover, .about-card:hover, .course-card:hover .course-top img, .steps li:hover::before { transform: none; }
+}

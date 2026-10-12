@@ -8,7 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Young+Serif&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="/images/favicon.png">
-<link rel="stylesheet" href="/css/site.css?v=17">
+<% if (typeof adminCss === 'undefined') { %>
+<%# Public pages: switch on the entrance animations before the first paint (unless the visitor prefers reduced motion).
+    If animations.js never loads, the timer switches them off again so nothing stays hidden. %>
+<script>(function (d) { if (window.matchMedia && !matchMedia('(prefers-reduced-motion: reduce)').matches) { d.classList.add('anim'); setTimeout(function () { if (!window.__anim) d.classList.remove('anim'); }, 3000); } })(document.documentElement);</script>
+<script src="/js/animations.js?v=1" defer></script>
+<% } %>
+<link rel="stylesheet" href="/css/site.css?v=19">
 <script src="/js/direct-upload.js?v=2" defer></script>
 <script src="/js/password-toggle.js?v=1" defer></script>
 <% if (typeof adminCss !== 'undefined') { %><link rel="stylesheet" href="/css/admin.css?v=9"><% } %>
