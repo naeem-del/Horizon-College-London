@@ -227,6 +227,11 @@ input[type=text], input[type=email], input[type=password], input[type=tel], inpu
   width: 100%; font: inherit; font-size: 1rem; padding: .72em .9em; border: 1.5px solid var(--line); border-radius: var(--r-sm); background: #fff; color: var(--ink); }
 input:focus, select:focus, textarea:focus { border-color: var(--navy-2); outline: none; box-shadow: 0 0 0 3px rgba(242,169,59,.35); }
 textarea { min-height: 130px; resize: vertical; }
+/* Show / hide button inside password fields (public/js/password-toggle.js) */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 3em; }
+.pw-toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--slate); cursor: pointer; }
+.pw-toggle:hover { color: var(--navy); background: var(--mist); }
 .check { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; font-weight: 500; }
 .check input { width: 18px; height: 18px; accent-color: var(--navy); }
 .errors { background: #FBEDEB; border-left: 4px solid var(--rose); padding: 14px 18px; border-radius: var(--r-md); margin-bottom: 22px; }
