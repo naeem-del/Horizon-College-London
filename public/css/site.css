@@ -266,15 +266,21 @@ textarea { min-height: 130px; resize: vertical; }
 
 /* Footer */
 .site-footer { background: var(--navy); color: #AEB9D3; padding: 64px 0 28px; margin-top: 0; }
-.site-footer .cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.site-footer .cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr max-content; gap: 32px; } /* Contact column fits the email address */
 .site-footer h4 { color: #fff; font-family: var(--sans); font-size: .95rem; margin: 0 0 12px; }
+/* Footer logo: on a white tile so the dark crest shows on navy, with the name underneath */
+.site-footer .footer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 18px; padding: 0; color: #fff; }
+.site-footer .footer-brand .brand-mark { width: 76px; height: 76px; padding: 8px; background: #fff; border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.site-footer .footer-brand .brand-name { color: #fff; font-size: 1.35rem; }
+.site-footer .footer-brand .brand-name small { color: var(--gold); font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; margin-top: 4px; }
+.site-footer .footer-brand:hover { color: #fff; }
 .site-footer .cols > div { min-width: 0; } /* let columns shrink instead of pushing the page wider */
-.site-footer a { color: #D5DCEC; text-decoration: none; display: block; padding: 3px 0; overflow-wrap: anywhere; }
+.site-footer a { color: #D5DCEC; text-decoration: none; display: block; padding: 3px 0; overflow-wrap: break-word; }
 .site-footer a:hover { color: var(--gold); }
 .site-footer .legal { border-top: 1px solid rgba(255,255,255,.12); margin-top: 44px; padding-top: 20px; font-size: .85rem; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 800px) { .site-footer .cols { grid-template-columns: 1fr 1fr; } }
 /* Phones: the Contact column (long email address) gets a full-width row of its own */
-@media (max-width: 480px) { .site-footer .cols > div:last-child { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .site-footer .cols > div:last-child { grid-column: 1 / -1; } }
 
 /* ---------- Student portal ---------- */
 .portal-bar { background: var(--navy); color: #fff; }
