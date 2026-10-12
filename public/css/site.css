@@ -268,10 +268,13 @@ textarea { min-height: 130px; resize: vertical; }
 .site-footer { background: var(--navy); color: #AEB9D3; padding: 64px 0 28px; margin-top: 0; }
 .site-footer .cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
 .site-footer h4 { color: #fff; font-family: var(--sans); font-size: .95rem; margin: 0 0 12px; }
-.site-footer a { color: #D5DCEC; text-decoration: none; display: block; padding: 3px 0; }
+.site-footer .cols > div { min-width: 0; } /* let columns shrink instead of pushing the page wider */
+.site-footer a { color: #D5DCEC; text-decoration: none; display: block; padding: 3px 0; overflow-wrap: anywhere; }
 .site-footer a:hover { color: var(--gold); }
 .site-footer .legal { border-top: 1px solid rgba(255,255,255,.12); margin-top: 44px; padding-top: 20px; font-size: .85rem; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 800px) { .site-footer .cols { grid-template-columns: 1fr 1fr; } }
+/* Phones: the Contact column (long email address) gets a full-width row of its own */
+@media (max-width: 480px) { .site-footer .cols > div:last-child { grid-column: 1 / -1; } }
 
 /* ---------- Student portal ---------- */
 .portal-bar { background: var(--navy); color: #fff; }
