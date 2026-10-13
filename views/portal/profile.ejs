@@ -18,5 +18,8 @@
     </div>
     <button class="btn btn-navy">Save details</button>
   </form>
+  <%- include('../partials/documents', { docs, heading: 'My documents',
+    intro: 'Keep copies of documents the college may ask for, such as proof of ID or your certificates. Only you and the college’s administrators can see them.',
+    base: '/portal/documents', saveUrl: '/portal/documents', signUrl: '/portal/documents/upload-url' }) %>
 </div></div>
 <%- include('../partials/footer') %>

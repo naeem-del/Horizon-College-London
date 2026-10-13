@@ -431,3 +431,12 @@ textarea { min-height: 130px; resize: vertical; }
   .btn, .course-card, .course-top img, .course-top .arc, .pillar, .about-card, .steps li::before { transition: none; }
   .btn:hover, .course-card:hover, .pillar:hover, .about-card:hover, .course-card:hover .course-top img, .steps li:hover::before { transform: none; }
 }
+
+/* Personal documents on a profile (views/partials/documents.ejs) */
+.documents { margin-top: 24px; }
+.doc-list { margin: 10px 0 18px; }
+.doc-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.doc-row:last-child { border-bottom: 0; }
+.doc-name { display: flex; gap: 10px; align-items: flex-start; min-width: 0; overflow-wrap: anywhere; }
+.doc-name .icon { flex: none; margin-top: 3px; color: var(--slate); }
+.doc-upload { border-top: 1px solid var(--line); padding-top: 18px; }

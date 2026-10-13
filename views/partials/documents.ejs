@@ -1,0 +1,33 @@
+<%# A person's documents (documents.js): the list, with open and delete, and an upload form.
+    Pass: docs, heading, intro (optional), base (e.g. '/portal/documents': files open at base/<id>, delete at base/<id>/delete),
+    saveUrl (where the upload form posts) and signUrl (signs the browser's upload to storage). %>
+<section class="panel documents" id="documents">
+  <h3><%= heading %></h3>
+  <% if (typeof intro !== 'undefined' && intro) { %><p class="small muted"><%= intro %></p><% } %>
+  <% if (docs.length) { %>
+    <div class="doc-list">
+      <% docs.forEach(d => { %>
+        <div class="doc-row">
+          <span class="doc-name"><%- icon('policies') %>
+            <span><a href="<%= base %>/<%= d.id %>" target="_blank" rel="noopener"><%= d.title || docTypes[d.kind] %></a><br>
+              <span class="small muted"><%= d.title ? docTypes[d.kind] + ' · ' : '' %><%= d.original_name %> · <%= date(d.created_at) %><%= d.uploaded_by && d.uploaded_by !== d.user_id && d.uploaded_by_name ? ' · added by ' + d.uploaded_by_name : '' %></span>
+            </span>
+          </span>
+          <form method="post" action="<%= base %>/<%= d.id %>/delete" onsubmit="return confirm('Delete this document? This can’t be undone.')"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-danger btn-sm">Delete</button></form>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <p class="muted small">No documents yet.</p>
+  <% } %>
+  <form method="post" action="<%= saveUrl %>" data-direct-upload="<%= signUrl %>" class="doc-upload">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="two">
+      <label class="field"><span>Type of document</span>
+        <select name="kind"><% Object.entries(docTypes).forEach(([value, label]) => { %><option value="<%= value %>"><%= label %></option><% }) %></select></label>
+      <label class="field"><span>Title <small style="display:inline;font-weight:400">(optional)</small></span><input type="text" name="title" maxlength="120" placeholder="e.g. Passport, Level 3 certificate"></label>
+    </div>
+    <label class="field"><span>File</span><input type="file" data-upload="document" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><small>PDF, Word, JPG or PNG, up to <%= uploadMB('document') %> MB.</small></label>
+    <button class="btn btn-navy btn-sm">Upload document</button>
+  </form>
+</section>

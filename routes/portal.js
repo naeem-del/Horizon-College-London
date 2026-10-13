@@ -1,9 +1,10 @@
 const router = require('express').Router();
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const { db } = require('../db');
+const { db, toId } = require('../db');
 const { requireLogin, flash } = require('../middleware');
 const storage = require('../storage');
+const documents = require('../documents');
 const learning = require('../learning');
 const scorm = require('../scorm');
 
@@ -220,8 +221,11 @@ router.get('/policies/:id/file', async (req, res, next) => {
 });
 
 router.get('/profile', async (req, res) => {
-  const me = await db.get('SELECT id,name,email,phone,dob,postcode FROM users WHERE id=?', req.user.id);
-  res.render('portal/profile', { title: 'My details', me });
+  const [me, docs] = await Promise.all([
+    db.get('SELECT id,name,email,phone,dob,postcode FROM users WHERE id=?', req.user.id),
+    documents.listFor(req.user.id),
+  ]);
+  res.render('portal/profile', { title: 'My details', me, docs });
 });
 
 router.post('/profile', async (req, res) => {
@@ -234,6 +238,39 @@ router.post('/profile', async (req, res) => {
   }
   flash(req, 'success', 'Details saved.');
   res.redirect('/portal/profile');
+});
+
+// ---------- My documents (on My details) ----------
+// Signs a one-time storage link for a document the browser is about to upload (see public/js/direct-upload.js)
+router.post('/documents/upload-url', async (req, res) => {
+  if (req.body.purpose !== 'document') return res.status(403).json({ error: 'You can’t upload this kind of file here.' });
+  const problem = storage.refuse('document', req.body.filename, Number(req.body.size));
+  if (problem) return res.status(422).json({ error: problem });
+  res.json(await storage.signUpload('document', req.body.filename));
+});
+router.post('/documents', async (req, res) => {
+  const error = await documents.save(req.user.id, req.user.id, req.body);
+  flash(req, error ? 'error' : 'success', error || 'Document uploaded.');
+  res.redirect('/portal/profile#documents');
+});
+// Learners can only open or delete their own
+const ownDocument = async req => {
+  const doc = await documents.find(toId(req.params.id));
+  return doc && doc.user_id === req.user.id ? doc : null;
+};
+router.get('/documents/:id', async (req, res, next) => {
+  const doc = await ownDocument(req);
+  if (!doc) return next();
+  const url = await documents.link(doc);
+  if (!url) return res.status(404).render('public/error', { title: 'File not found', message: 'This document is no longer in storage.' });
+  res.redirect(url);
+});
+router.post('/documents/:id/delete', async (req, res, next) => {
+  const doc = await ownDocument(req);
+  if (!doc) return next();
+  await documents.remove(doc);
+  flash(req, 'success', 'Document deleted.');
+  res.redirect('/portal/profile#documents');
 });
 
 module.exports = router;

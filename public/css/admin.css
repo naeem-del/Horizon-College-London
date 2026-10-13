@@ -140,3 +140,61 @@ td form { display: inline; }
 .row-progress { display: flex; align-items: center; gap: 12px; flex: 0 1 300px; justify-content: flex-end; }
 .row-progress .progress { flex: 1; margin: 0; min-width: 160px; }
 @media (max-width: 600px) { .batch-row { flex-wrap: wrap; } .row-progress { flex-basis: 100%; justify-content: flex-start; } }
+
+/* Sidebar icons, fold-out groups and the icons-only mode (public/js/admin-nav.js) */
+.admin-side nav a { justify-content: flex-start; gap: 11px; }
+.admin-side nav a .label { flex: 1; min-width: 0; }
+.admin-side .icon { flex: none; opacity: .8; }
+.admin-side nav a:hover .icon, .admin-side nav a.on .icon { opacity: 1; }
+.admin-side .group { display: flex; align-items: center; gap: 8px; width: 100%; margin: 22px 0 6px; padding: 4px 12px; background: none; border: 0; border-radius: 6px; font: inherit; font-size: .78rem; color: #8392B3; text-align: left; cursor: pointer; }
+.admin-side .group:hover { color: #C9D2E6; }
+.admin-side .group .label { flex: 1; }
+.admin-side .group .icon { transition: transform .2s ease; }
+.admin-side .group[aria-expanded="false"] .icon { transform: rotate(-90deg); }
+.admin-side .group-count { display: none; }
+.admin-side .group[aria-expanded="false"] .group-count { display: inline-block; } /* pending items in a closed group */
+.admin-side .group-items.closed { display: none; }
+.side-toggle { display: flex; align-items: center; gap: 11px; width: 100%; margin-top: 18px; padding: 9px 12px; background: none; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: #C9D2E6; font: inherit; font-size: .88rem; cursor: pointer; }
+.side-toggle:hover { color: #fff; background: rgba(255,255,255,.07); }
+.admin-side .me .link-btn { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (min-width: 901px) {
+  .admin-shell { transition: grid-template-columns .2s ease; }
+  .admin-shell.collapsed { grid-template-columns: 76px 1fr; }
+  .collapsed .admin-side { padding: 18px 10px; overflow-x: hidden; }
+  /* Labels stay readable by screen readers, just not shown */
+  .collapsed .admin-side .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .collapsed .admin-side .brand { justify-content: center; margin-bottom: 18px; padding: 8px; }
+  .collapsed .admin-side .brand .brand-mark { width: 40px; height: 40px; }
+  .collapsed .admin-side .brand .brand-name { display: none; }
+  .collapsed .admin-side nav a, .collapsed .side-toggle { position: relative; justify-content: center; padding: 10px 0; }
+  /* Group headings become thin dividers, and every item shows */
+  .collapsed .admin-side .group { height: 1px; margin: 12px 6px; padding: 0; background: rgba(255,255,255,.12); pointer-events: none; }
+  .collapsed .admin-side .group .icon, .collapsed .admin-side .group .count { display: none; }
+  .collapsed .admin-side .group-items.closed { display: block; }
+  .collapsed .admin-side nav .count { position: absolute; top: 2px; right: 6px; padding: 0 5px; font-size: .62rem; line-height: 1.5; }
+  .collapsed .side-toggle .icon { transform: scaleX(-1); }
+  .collapsed .admin-side .me { padding: 12px 0; text-align: center; }
+  .collapsed .admin-side .me .person { justify-content: center; margin-bottom: 10px; }
+  .collapsed .admin-side .me .link-btn { justify-content: center; }
+}
+@media (max-width: 900px) {
+  .side-toggle { display: none; }
+}
+
+/* Phones and small tablets: a compact header bar; the menu, your name and "Log out" open with the Menu button */
+.admin-burger .when-open { display: none; }
+.admin-side.open .admin-burger .when-open { display: inline-flex; }
+.admin-side.open .admin-burger .when-closed { display: none; }
+.admin-burger span { align-items: center; gap: 6px; }
+.admin-burger .when-closed { display: inline-flex; }
+@media (max-width: 900px) {
+  .admin-side { padding: 12px 16px; }
+  .admin-side .brand { gap: 8px; padding: 6px 10px; }
+  .admin-side .brand .brand-mark { width: 40px; height: 40px; }
+  .admin-side .brand .brand-name { font-size: 1.1rem; }
+  .admin-burger { margin-top: 9px; padding: 7px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
+  .admin-side .me { display: none; }
+  .admin-side.open .me { display: block; margin-top: 14px; }
+  .admin-side.open nav { margin-top: 6px; }
+}

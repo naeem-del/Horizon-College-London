@@ -11,6 +11,8 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 Object.assign(app.locals, require('./helpers'));
 app.locals.siteName = process.env.SITE_NAME || 'Horizon College London';
+// Kinds of personal document a profile can hold (documents.js)
+app.locals.docTypes = require('./documents').TYPES;
 // Upload size limit in MB for a form field, for help text such as "up to 50 MB"
 const { UPLOADS, FILE_LIMIT_MB } = require('./storage');
 app.locals.uploadMB = purpose => Math.round(UPLOADS[purpose].max / (1024 * 1024));

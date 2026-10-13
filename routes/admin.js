@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { db, slugify, toId } = require('../db');
 const { requireRole, flash } = require('../middleware');
 const storage = require('../storage');
+const documents = require('../documents');
 const links = require('../password-links');
 const { waitUntil } = require('@vercel/functions');
 const mailer = require('../mailer');
@@ -656,7 +657,7 @@ router.post('/students', adminOnly, async (req, res) => {
 router.get('/students/:id', async (req, res, next) => {
   const student = await db.get('SELECT * FROM users WHERE id=?', req.params.id);
   if (!student) return next();
-  const [enrolments, submissions, scormResults, courses, teaching] = await Promise.all([
+  const [enrolments, submissions, scormResults, courses, teaching, docs] = await Promise.all([
     db.all(`SELECT e.*, c.title, c.slug, b.name batch_name FROM enrolments e JOIN courses c ON c.id=e.course_id
       LEFT JOIN batches b ON b.id=e.batch_id WHERE e.user_id=? ORDER BY e.created_at DESC`, student.id),
     db.all('SELECT s.*, l.title lesson_title, l.total_marks FROM submissions s JOIN lessons l ON l.id=s.lesson_id WHERE s.user_id=? ORDER BY s.id DESC', student.id),
@@ -664,12 +665,14 @@ router.get('/students/:id', async (req, res, next) => {
       JOIN modules m ON m.id=l.module_id JOIN courses c ON c.id=m.course_id WHERE a.user_id=? ORDER BY a.updated_at DESC`, student.id),
     db.all('SELECT id,title FROM courses ORDER BY title'),
     db.all('SELECT c.id, c.title FROM course_staff cs JOIN courses c ON c.id=cs.course_id WHERE cs.user_id=? ORDER BY c.title', student.id),
+    // Personal documents are for administrators only (tutors don't see them)
+    isAdmin(req) ? documents.listFor(student.id) : null,
   ]);
   await Promise.all(enrolments.map(async e => {
     e.progress = await learning.progress(student.id, e.course_id);
     e.batches = (await teaches(req, e.course_id)) ? await batchList(e.course_id) : null; // only staff on the course can change the batch
   }));
-  res.render('admin/student', { title: student.name, student, enrolments, submissions, scormResults, courses, teaching, section: student.role === 'student' ? 'learners' : 'staff' });
+  res.render('admin/student', { title: student.name, student, enrolments, submissions, scormResults, courses, teaching, docs, section: student.role === 'student' ? 'learners' : 'staff' });
 });
 router.post('/students/:id/role', adminOnly, async (req, res) => {
   if (Number(req.params.id) === req.user.id) { flash(req, 'error', 'You can’t change your own role.'); return res.redirect(back(req, '/admin/students')); }
@@ -710,6 +713,7 @@ router.post('/students/:id/enrol', adminOnly, async (req, res) => {
 });
 router.post('/students/:id/delete', adminOnly, async (req, res) => {
   if (Number(req.params.id) === req.user.id) { flash(req, 'error', 'You can’t delete your own account.'); return res.redirect('/admin/students'); }
+  await documents.removeAllFor(req.params.id); // their files; the rows go with the account
   const gone = await db.get('DELETE FROM users WHERE id=? RETURNING role, photo', req.params.id);
   if (gone) await removePhoto(gone.photo);
   flash(req, 'success', 'Account deleted.');
@@ -754,8 +758,8 @@ router.post('/policies/:id/delete', adminOnly, async (req, res) => {
 });
 
 // ---------- My account (any staff member) ----------
-router.get('/account', (req, res) => {
-  res.render('admin/account', { title: 'My account', section: 'account' });
+router.get('/account', async (req, res) => {
+  res.render('admin/account', { title: 'My account', section: 'account', docs: await documents.listFor(req.user.id) });
 });
 router.post('/account', async (req, res) => {
   const me = await db.get('SELECT * FROM users WHERE id=?', req.user.id);
@@ -769,6 +773,40 @@ router.post('/account', async (req, res) => {
   await db.run('UPDATE users SET name=? WHERE id=?', name.trim(), me.id);
   flash(req, 'success', password ? 'Details and password updated.' : 'Details updated.');
   res.redirect('/admin/account');
+});
+
+// ---------- Documents on profiles ----------
+// Staff keep their own under My account; administrators see, add and delete anyone's on that person's page
+router.post('/account/documents', async (req, res) => {
+  const error = await documents.save(req.user.id, req.user.id, req.body);
+  flash(req, error ? 'error' : 'success', error || 'Document uploaded.');
+  res.redirect('/admin/account#documents');
+});
+router.post('/students/:id/documents', adminOnly, async (req, res, next) => {
+  const person = await db.get('SELECT id FROM users WHERE id=?', req.params.id);
+  if (!person) return next();
+  const error = await documents.save(person.id, req.user.id, req.body);
+  flash(req, error ? 'error' : 'success', error || 'Document added to their profile.');
+  res.redirect(`/admin/students/${person.id}#documents`);
+});
+// Administrators can open or delete anyone's documents; other staff only their own
+const allowedDocument = async req => {
+  const doc = await documents.find(req.params.id);
+  return doc && (isAdmin(req) || doc.user_id === req.user.id) ? doc : null;
+};
+router.get('/documents/:id', async (req, res, next) => {
+  const doc = await allowedDocument(req);
+  if (!doc) return next();
+  const url = await documents.link(doc);
+  if (!url) return res.status(404).render('public/error', { title: 'File not found', message: 'This document is no longer in storage.' });
+  res.redirect(url);
+});
+router.post('/documents/:id/delete', async (req, res, next) => {
+  const doc = await allowedDocument(req);
+  if (!doc) return next();
+  await documents.remove(doc);
+  flash(req, 'success', 'Document deleted.');
+  res.redirect(doc.user_id === req.user.id ? '/admin/account#documents' : `/admin/students/${doc.user_id}#documents`);
 });
 
 // ---------- Enrolments ----------

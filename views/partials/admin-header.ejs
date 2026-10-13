@@ -1,33 +1,57 @@
 <%- include('head') %>
 <body class="admin">
-<div class="admin-shell">
+<div class="admin-shell" id="shell">
+  <%# Apply the remembered "icons only" state before the sidebar draws, so it doesn't jump (public/js/admin-nav.js) %>
+  <script>try { if (localStorage.getItem('adminNav') === 'collapsed') document.getElementById('shell').classList.add('collapsed'); } catch (e) {}</script>
   <aside class="admin-side" id="side">
-    <button class="admin-burger" onclick="document.getElementById('side').classList.toggle('open')">Menu</button>
+    <button type="button" class="admin-burger" id="side-menu" aria-expanded="false" aria-controls="side"><span class="when-closed"><%- icon('menu') %>Menu</span><span class="when-open"><%- icon('close') %>Close</span></button>
     <a class="brand" href="/admin"><%- include('mark') %><span class="brand-name">Horizon<small>Admin</small></span></a>
-    <nav>
-      <% const isAdmin = user.role === 'admin'; const on = p => (p === '/admin' ? path === '/admin' : path.startsWith(p)) ? 'on' : ''; %>
-      <a class="<%= on('/admin') %>" href="/admin">Dashboard</a>
-      <div class="group">Teaching</div>
-      <a class="<%= on('/admin/submissions') %>" href="/admin/submissions">Evidence review <% if (badges.submissions) { %><span class="count"><%= badges.submissions %></span><% } %></a>
+    <nav aria-label="Admin menu">
+      <% const isAdmin = user.role === 'admin'; const on = p => (p === '/admin' ? path === '/admin' : path.startsWith(p)); %>
       <% const sec = typeof section !== 'undefined' ? section : (path.startsWith('/admin/staff') ? 'staff' : path.startsWith('/admin/students') ? 'learners' : ''); %>
-      <a class="<%= sec === 'learners' ? 'on' : '' %>" href="/admin/students">Learners</a>
-      <a class="<%= sec === 'staff' ? 'on' : '' %>" href="/admin/staff">Staff</a>
-      <% if (!isAdmin) { %><a class="<%= sec === 'courses' || path.startsWith('/admin/courses') ? 'on' : '' %>" href="/admin/courses">My courses</a><% } %>
-      <% if (isAdmin) { %>
-        <a class="<%= on('/admin/enrolments') %>" href="/admin/enrolments">Enrolments <% if (badges.enrolments) { %><span class="count"><%= badges.enrolments %></span><% } %></a>
-        <a class="<%= on('/admin/enquiries') %>" href="/admin/enquiries">Enquiries <% if (badges.enquiries) { %><span class="count"><%= badges.enquiries %></span><% } %></a>
-        <div class="group">Catalogue</div>
-        <a class="<%= sec === 'courses' || path.startsWith('/admin/courses') ? 'on' : '' %>" href="/admin/courses">Courses</a>
-        <a class="<%= on('/admin/bodies') %>" href="/admin/bodies">Awarding bodies</a>
+      <% const coursesOn = sec === 'courses' || path.startsWith('/admin/courses'); %>
+      <%# One menu entry: icon, label (hidden in the icons-only menu, where it becomes the hover name) and an optional count %>
+      <% const item = (href, iconName, text, active, count, extra) => { %>
+        <a class="<%= active ? 'on' : '' %>" href="<%= href %>"<%- extra || '' %>><%- icon(iconName) %><span class="label"><%= text %></span><% if (count) { %><span class="count"><%= count %></span><% } %></a>
       <% } %>
-      <div class="group">Site</div>
-      <a class="<%= sec === 'policies' ? 'on' : '' %>" href="/admin/policies">Policies</a>
-      <a class="<%= sec === 'account' ? 'on' : '' %>" href="/admin/account">My account</a>
-      <a href="/" target="_blank">View website</a>
+      <%# A group heading that folds its items open or closed; while closed it shows the group's total count %>
+      <% const group = (id, text, count) => { %>
+        <button type="button" class="group" data-group="<%= id %>" aria-expanded="true" aria-controls="nav-<%= id %>"><span class="label"><%= text %></span><% if (count) { %><span class="count group-count"><%= count %></span><% } %><%- icon('chevron', 14) %></button>
+      <% } %>
+      <% item('/admin', 'dashboard', 'Dashboard', on('/admin')) %>
+
+      <% group('teaching', 'Teaching', badges.submissions + (isAdmin ? badges.enrolments + badges.enquiries : 0)) %>
+      <div class="group-items" id="nav-teaching">
+        <% item('/admin/submissions', 'evidence', 'Evidence review', on('/admin/submissions'), badges.submissions) %>
+        <% item('/admin/students', 'learners', 'Learners', sec === 'learners') %>
+        <% item('/admin/staff', 'staff', 'Staff', sec === 'staff') %>
+        <% if (!isAdmin) item('/admin/courses', 'courses', 'My courses', coursesOn) %>
+        <% if (isAdmin) { %>
+          <% item('/admin/enrolments', 'enrolments', 'Enrolments', on('/admin/enrolments'), badges.enrolments) %>
+          <% item('/admin/enquiries', 'enquiries', 'Enquiries', on('/admin/enquiries'), badges.enquiries) %>
+        <% } %>
+      </div>
+
+      <% if (isAdmin) { %>
+        <% group('catalogue', 'Catalogue', 0) %>
+        <div class="group-items" id="nav-catalogue">
+          <% item('/admin/courses', 'courses', 'Courses', coursesOn) %>
+          <% item('/admin/bodies', 'bodies', 'Awarding bodies', on('/admin/bodies')) %>
+        </div>
+      <% } %>
+
+      <% group('site', 'Site', 0) %>
+      <div class="group-items" id="nav-site">
+        <% item('/admin/policies', 'policies', 'Policies', sec === 'policies') %>
+        <% item('/admin/account', 'account', 'My account', sec === 'account') %>
+        <% item('/', 'website', 'View website', false, 0, ' target="_blank"') %>
+      </div>
     </nav>
-    <div class="me"><span class="person"><%- include('avatar', { who: user }) %><%= user.name %></span>
-      <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link-btn">Log out</button></form>
+    <button type="button" class="side-toggle" id="side-toggle" aria-expanded="true" aria-controls="side"><%- icon('collapse') %><span class="label">Collapse menu</span></button>
+    <div class="me"><span class="person"><%- include('avatar', { who: user }) %><span class="label"><%= user.name %></span></span>
+      <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="link-btn"><%- icon('logout', 16) %><span class="label">Log out</span></button></form>
     </div>
   </aside>
+  <script src="/js/admin-nav.js?v=2"></script>
   <main class="admin-main" id="main">
   <% if (flash) { %><div class="flash" style="margin:0 0 20px;padding:0;max-width:none" role="status"><div class="<%= flash.type %>"><%= flash.text %></div></div><% } %>

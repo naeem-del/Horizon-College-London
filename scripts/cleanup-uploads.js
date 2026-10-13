@@ -20,6 +20,7 @@ const USED_BY = {
   videos: 'SELECT video_file AS f FROM lessons',
   evidence: 'SELECT file AS f FROM submissions',
   policies: 'SELECT file AS f FROM policies',
+  documents: 'SELECT file AS f FROM user_documents',
 };
 const mb = bytes => `${(bytes / 1048576).toFixed(1)} MB`;
 

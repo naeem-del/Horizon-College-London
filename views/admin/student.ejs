@@ -94,6 +94,11 @@
   </div>
   <% } %>
 </div>
+<% if (docs) { %>
+  <%- include('../partials/documents', { docs, heading: 'Documents',
+    intro: `Personal documents on ${student.name}’s profile. Only administrators and ${student.name} can see them.`,
+    base: '/admin/documents', saveUrl: `/admin/students/${student.id}/documents`, signUrl: '/admin/uploads/sign' }) %>
+<% } %>
 <h3 style="margin-top:28px">Evidence</h3>
 <div class="table-wrap"><table>
   <tr><th>Task</th><th>File</th><th>Status</th><th>Mark</th><th>Uploaded</th></tr>

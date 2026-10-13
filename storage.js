@@ -2,7 +2,7 @@
 // link (see public/js/direct-upload.js), so large files never pass through the web server, which on Vercel accepts
 // at most 4.5 MB per request. The database keeps only each file's name; its folder decides the bucket:
 //   media   (public)  images/, files/, videos/   linked directly from pages
-//   private (no public access)  evidence/, policies/   handed out as short-lived signed links after a permission check
+//   private (no public access)  evidence/, policies/, documents/, scorm/   handed out as short-lived signed links after a permission check
 const crypto = require('crypto');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
@@ -11,12 +11,13 @@ const sb = createClient(process.env.SUPABASE_URL || 'http://localhost', process.
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const BUCKET = { images: 'media', files: 'media', videos: 'media', evidence: 'private', policies: 'private', scorm: 'private' };
+const BUCKET = { images: 'media', files: 'media', videos: 'media', evidence: 'private', policies: 'private', scorm: 'private', documents: 'private' };
 const MB = 1024 * 1024;
 const IMAGES = ['.jpg', '.jpeg', '.png', '.webp'];
 const DOCS = ['.pdf', '.doc', '.docx', '.xlsx', '.pptx', '.zip'];
 
-// What each upload field may contain. `staff` uploads come from the admin area; `admin` ones only from administrators.
+// What each upload field may contain. `staff` uploads come from the admin area; `admin` ones only from administrators;
+// `anyone` means any logged-in user (each route then checks whose profile it's for).
 const UPLOADS = {
   logo: { folder: 'images', exts: IMAGES, max: 20 * MB, who: 'admin' },
   'course-image': { folder: 'images', exts: IMAGES, max: 20 * MB, who: 'admin' },
@@ -25,6 +26,7 @@ const UPLOADS = {
   attachment: { folder: 'files', exts: DOCS, max: (Number(process.env.MAX_FILE_MB) || 50) * MB, who: 'staff' },
   video: { folder: 'videos', exts: ['.mp4', '.webm', '.mov'], max: (Number(process.env.MAX_VIDEO_MB) || 50) * MB, who: 'staff' },
   evidence: { folder: 'evidence', exts: ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx', '.pptx', '.mp4', '.zip'], max: 20 * MB, who: 'learner' },
+  document: { folder: 'documents', exts: ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'], max: 20 * MB, who: 'anyone' },
   // A SCORM .zip isn't stored as one file: the browser unzips it and uploads each file (see scorm.js)
   scorm: { folder: 'scorm', exts: ['.zip'], max: (Number(process.env.MAX_SCORM_MB) || 500) * MB, who: 'staff', unzipped: true },
 };

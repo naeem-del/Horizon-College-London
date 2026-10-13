@@ -11,4 +11,9 @@
   <label class="field"><span>Confirm new password</span><input type="password" name="password2" autocomplete="new-password"></label>
   <button class="btn btn-navy">Save</button>
 </form>
+<div style="max-width:620px">
+  <%- include('../partials/documents', { docs, heading: 'My documents',
+    intro: 'Keep copies of your documents here, such as proof of ID, qualifications, a DBS check or right to work. Only you and the administrators can see them.',
+    base: '/admin/documents', saveUrl: '/admin/account/documents', signUrl: '/admin/uploads/sign' }) %>
+</div>
 <%- include('../partials/admin-footer') %>
